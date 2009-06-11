@@ -1,0 +1,14 @@
+(library "seteh" libcurie
+  (name "Seteh")
+  (description "Shell Utilities in Library Form")
+  (version "1")
+  (url "http://kyuba.org/")
+
+  (code "tar")
+
+  (headers
+        "tar")
+
+;  (documentation
+;        "description")
+)
