@@ -26,29 +26,6 @@
  * THE SOFTWARE.
 */
 
-#ifndef LIBSETEH_TAR_H
-#define LIBSETEH_TAR_H
+#include <seteh/lambda.h>
+#include <seteh/lambda-internal.h>
 
-#include <curie/io.h>
-#include <curie/regex.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void tar_x    (struct io *io,
-               void (*on_new_file)(const char *, struct io *, void *),
-               void (*on_end_of_archive)(void *),
-               void *aux);
-
-void tar_x_rx (struct io *io,
-               struct graph *filter,
-               void (*on_new_file)(const char *, struct io *, void *),
-               void (*on_end_of_archive)(void *),
-               void *aux);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

@@ -31,9 +31,17 @@
 
 #include <curie/io.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void patch    (struct io *patch,
                const char *path,
                void (*on_patch_end)(void *),
                void *aux);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

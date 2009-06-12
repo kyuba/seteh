@@ -4,10 +4,10 @@
   (version "1")
   (url "http://kyuba.org/")
 
-  (code "tar" "patch")
+  (code "tar" "patch" "lambda")
 
   (headers
-        "tar" "patch")
+        "tar" "patch" "lambda")
 
 ;  (documentation
 ;        "description")
