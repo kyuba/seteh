@@ -35,12 +35,24 @@
 extern "C" {
 #endif
 
-struct lambda;
+#define lambda_type_identifier      0x03bb
+#define mu_type_identifier          0x03bc
+#define environment_type_identifier 0x03b5
+#define primitive_type_identifier   0x03c6
 
-typedef struct lambda *lambda;
+#define lambdap(sx)      sx_customp(sx,lambda_type_identifier)
+#define mup(sx)          sx_customp(sx,mu_type_identifier)
+#define environmentp(sx) sx_customp(sx,environment_type_identifier)
+#define primitivep(sx)   sx_customp(sx,primitive_type_identifier)
 
-sexpr  lx_apply  (lambda expression, sexpr arguments);
-lambda lx_lambda (sexpr expression);
+void initialise_seteh ( void );
+
+sexpr lx_lambda             (sexpr sx);
+sexpr lx_mu                 (sexpr sx);
+sexpr lx_apply              (sexpr sx, sexpr args, sexpr env);
+sexpr lx_eval               (sexpr sx, sexpr env);
+sexpr lx_make_environment   ();
+sexpr lx_environment_lookup (sexpr env, sexpr key);
 
 #ifdef __cplusplus
 }

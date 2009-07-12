@@ -26,58 +26,33 @@
  * THE SOFTWARE.
 */
 
-#ifndef LIBSETEH_LAMBDA_INTERNAL_H
-#define LIBSETEH_LAMBDA_INTERNAL_H
+#include <seteh/lambda.h>
 
-#include <curie/sexpr.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define lambda_argument_base 0xf0000
-
-enum primitive_ops
+int cmain ()
 {
-    op_lambda,
-    op_mu,
-    op_addition,
-    op_subtraction,
-    op_multiplication,
-    op_division,
-    op_modulo
-};
+    struct io *in          = io_open_read   ("tests/data/lambda-1.sx");
+    struct sexpr_io *io    = sx_open_io     (in, io_open_null);
+    struct sexpr_io *stdio = sx_open_stdout ();
+    sexpr sx, env = lx_make_environment();
+    int rv = 1;
 
-struct lambda
-{
-    unsigned int type;
-    unsigned int arguments;
-    sexpr code;
-};
+    initialise_seteh ();
 
-struct environment
-{
-    unsigned int type;
-    sexpr environment;
-};
+    while (!eofp(sx = sx_read (io)))
+    {
+        if (!nexp (sx))
+        {
+            sexpr eval = lx_eval (sx, env);
 
-struct primitive
-{
-    unsigned int type;
-    enum primitive_ops op;
-};
+            if (truep(equalp (lx_eval (sx, env), make_integer (42))))
+            {
+                rv = 0;
+            }
 
-define_symbol (sym_bad_primitive, "bad-primitive");
-define_symbol (sym_lambda,        "lambda");
-define_symbol (sym_mu,            "mu");
-define_symbol (sym_plus,          "+");
-define_symbol (sym_minus,         "-");
-define_symbol (sym_multiply,      "*");
-define_symbol (sym_divide,        "/");
-define_symbol (sym_modulo,        "%");
+            sx_write (stdio, sx);
+            sx_write (stdio, eval);
+        }
+    }
 
-#ifdef __cplusplus
+    return rv;
 }
-#endif
-
-#endif

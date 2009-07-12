@@ -9,6 +9,9 @@
   (headers
         "tar" "patch" "lambda")
 
+  (test-cases
+        "lambda")
+
 ;  (documentation
 ;        "description")
 )
