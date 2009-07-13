@@ -35,7 +35,11 @@
 extern "C" {
 #endif
 
+#if 0
 #define lambda_argument_base 0xf0000
+#endif
+
+#define lambda_argument_base 0x2801
 
 enum primitive_ops
 {
@@ -53,6 +57,7 @@ struct lambda
     unsigned int type;
     unsigned int arguments;
     sexpr code;
+    sexpr environment;
 };
 
 struct environment

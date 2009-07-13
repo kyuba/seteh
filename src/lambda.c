@@ -90,9 +90,45 @@ void initialise_seteh ( void )
     }
 }
 
-static sexpr lx_code (sexpr args, sexpr code)
+static sexpr lx_code (sexpr environment, sexpr args, sexpr code)
 {
-    return code;
+    sexpr rv = sx_end_of_list, t, n;
+
+    while (consp (code))
+    {
+        t = car (code);
+
+        if (symbolp (t))
+        {
+            n = args;
+            int i = 0;
+
+            while (consp(n))
+            {
+                i++;
+
+                if (truep (equalp (car (n), t)))
+                {
+                    rv = cons (make_special (lambda_argument_base + i), rv);
+                    goto next;
+                }
+
+                n = cdr (n);
+            }
+        }
+        else if (consp (t))
+        {
+            rv = cons (lx_compile (t, environment), rv);
+            goto next;
+        }
+
+        rv = cons (t, rv);
+
+      next:
+        code = cdr (code);
+    }
+
+    return sx_reverse (rv);
 }
 
 static sexpr make_lambda (unsigned int type, sexpr args)
@@ -100,11 +136,22 @@ static sexpr make_lambda (unsigned int type, sexpr args)
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct lambda));
     struct lambda *lx = get_pool_mem (&pool);
-    sexpr arguments, code, t;
+    sexpr arguments, code, t, environment;
 
     if (lx == (struct lambda *)0)
     {
         return sx_nonexistent;
+    }
+
+    t = car (args);
+    if (environmentp (t))
+    {
+        environment = t;
+        args = cdr (args);
+    }
+    else
+    {
+        environment = lx_make_environment ();
     }
 
     arguments = car (args);
@@ -120,7 +167,7 @@ static sexpr make_lambda (unsigned int type, sexpr args)
         while (consp (t))
         {
             lx->arguments++;
-            t = cdr (arguments);
+            t = cdr (t);
         }
     }
     else if (integerp (arguments))
@@ -128,7 +175,8 @@ static sexpr make_lambda (unsigned int type, sexpr args)
         lx->arguments = sx_integer (arguments);
     }
 
-    lx->code = lx_code(args, code);
+    lx->code = lx_code (environment, arguments, code);
+    lx->environment = environment;
 
     return (sexpr)lx;
 }
@@ -147,7 +195,7 @@ static sexpr lambda_serialise (sexpr lambda)
 {
     struct lambda *lx = (struct lambda *)lambda;
 
-    return cons (make_integer(lx->arguments), lx->code);
+    return cons (lx->environment, cons (make_integer(lx->arguments), lx->code));
 }
 
 static sexpr lambda_unserialise (sexpr lambda)
@@ -406,11 +454,50 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr env)
     return args;
 }
 
+sexpr lx_apply_lambda (unsigned int argnum, sexpr code, sexpr env, sexpr args)
+{
+    int argc = 0;
+    sexpr t = args, rv = sx_nonexistent;
+
+    while (consp (t))
+    {
+        argc++;
+
+        t = cdr (t);
+    }
+
+    if ((argnum == 0) && (argc == 0))
+    {
+        t = code;
+
+        while (consp (t))
+        {
+            argc++;
+
+            rv = lx_eval (car (t), env);
+
+            t = cdr (t);
+        }
+    }
+
+    return rv;
+}
+
 sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
 {
     if (lambdap (sx))
     {
-        return sx;
+        struct lambda *p = (struct lambda *)sx;
+        sexpr s = lx_apply_lambda (p->arguments, p->code, env, args);
+
+        if (nexp (s))
+        {
+            return sx;
+        }
+        else
+        {
+            return s;
+        }
     }
     else if (mup (sx))
     {
@@ -426,7 +513,7 @@ sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
     return sx_nonexistent;
 }
 
-sexpr lx_eval (sexpr sx, sexpr env)
+sexpr lx_eval_compile (sexpr sx, sexpr env, char eval)
 {
     while (consp (sx))
     {
@@ -446,7 +533,7 @@ sexpr lx_eval (sexpr sx, sexpr env)
                 sx = cons (sx, sxcdr);
             }
         }
-        else if (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar))
+        else if (eval && (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar)))
         {
             sx = lx_apply (sxcar, sxcdr, env);
         }
@@ -461,6 +548,16 @@ sexpr lx_eval (sexpr sx, sexpr env)
     }
 
     return sx;
+}
+
+sexpr lx_eval (sexpr sx, sexpr env)
+{
+    return lx_eval_compile (sx, env, 1);
+}
+
+sexpr lx_compile (sexpr sx, sexpr env)
+{
+    return lx_eval_compile (sx, env, 0);
 }
 
 sexpr lx_make_environment ()
