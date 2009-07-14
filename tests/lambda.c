@@ -28,29 +28,35 @@
 
 #include <seteh/lambda.h>
 
+struct sexpr_io *stdio;
+
 int cmain ()
 {
-    struct io *in          = io_open_read   ("tests/data/lambda-1.sx");
-    struct sexpr_io *io    = sx_open_io     (in, io_open_null);
-    struct sexpr_io *stdio = sx_open_stdout ();
-    sexpr sx, env = lx_make_environment();
+    struct io *in       = io_open_read        ("tests/data/lambda-1.sx");
+    struct sexpr_io *io = sx_open_io          (in, io_open_null);
+    sexpr sx, env       = lx_make_environment (sx_end_of_list);
     int rv = 1;
 
+    stdio               = sx_open_stdout      ();
+
     initialise_seteh ();
+
+    env = lx_environment_bind (env, make_symbol ("f"), make_integer (2));
 
     while (!eofp(sx = sx_read (io)))
     {
         if (!nexp (sx))
         {
-            sexpr eval = lx_eval (sx, env);
+            sexpr eval = lx_eval (sx, &env);
 
-            if (truep(equalp (lx_eval (sx, env), make_integer (42))))
+            if (truep(equalp (eval, make_integer (42))))
             {
                 rv = 0;
             }
 
-            sx_write (stdio, sx);
+/*            sx_write (stdio, sx);*/
             sx_write (stdio, eval);
+/*            sx_write (stdio, env);*/
         }
     }
 

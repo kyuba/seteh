@@ -49,13 +49,15 @@ enum primitive_ops
     op_subtraction,
     op_multiplication,
     op_division,
-    op_modulo
+    op_modulo,
+    op_dereference,
+    op_unbound
 };
 
 struct lambda
 {
     unsigned int type;
-    unsigned int arguments;
+    sexpr arguments;
     sexpr code;
     sexpr environment;
 };
@@ -72,14 +74,18 @@ struct primitive
     enum primitive_ops op;
 };
 
-define_symbol (sym_bad_primitive, "bad-primitive");
-define_symbol (sym_lambda,        "lambda");
-define_symbol (sym_mu,            "mu");
-define_symbol (sym_plus,          "+");
-define_symbol (sym_minus,         "-");
-define_symbol (sym_multiply,      "*");
-define_symbol (sym_divide,        "/");
-define_symbol (sym_modulo,        "%");
+define_symbol (sym_bad_primitive,        "bad-primitive");
+define_symbol (sym_lambda,               "lambda");
+define_symbol (sym_mu,                   "mu");
+define_symbol (sym_plus,                 "+");
+define_symbol (sym_minus,                "-");
+define_symbol (sym_multiply,             "*");
+define_symbol (sym_divide,               "/");
+define_symbol (sym_modulo,               "%");
+define_symbol (sym_dereference,          "dereference");
+define_symbol (sym_unbound,              "unbound");
+
+/* struct sexpr_io *stdio;*/
 
 #ifdef __cplusplus
 }

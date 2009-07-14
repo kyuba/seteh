@@ -90,48 +90,28 @@ void initialise_seteh ( void )
     }
 }
 
-static sexpr lx_code (sexpr environment, sexpr args, sexpr code)
+static sexpr lx_code (sexpr *environment, sexpr args, sexpr code)
 {
-    sexpr rv = sx_end_of_list, t, n;
+    sexpr rv = sx_end_of_list, n = args;
+
+    while (consp (n))
+    {
+        *environment = lx_environment_unbind (*environment, car (n));
+
+        n = car (n);
+    }
 
     while (consp (code))
     {
-        t = car (code);
+        rv = cons (lx_eval (car (code), environment), rv);
 
-        if (symbolp (t))
-        {
-            n = args;
-            int i = 0;
-
-            while (consp(n))
-            {
-                i++;
-
-                if (truep (equalp (car (n), t)))
-                {
-                    rv = cons (make_special (lambda_argument_base + i), rv);
-                    goto next;
-                }
-
-                n = cdr (n);
-            }
-        }
-        else if (consp (t))
-        {
-            rv = cons (lx_compile (t, environment), rv);
-            goto next;
-        }
-
-        rv = cons (t, rv);
-
-      next:
         code = cdr (code);
     }
 
     return sx_reverse (rv);
 }
 
-static sexpr make_lambda (unsigned int type, sexpr args)
+static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct lambda));
@@ -144,14 +124,21 @@ static sexpr make_lambda (unsigned int type, sexpr args)
     }
 
     t = car (args);
-    if (environmentp (t))
+    if (nexp (env))
     {
-        environment = t;
-        args = cdr (args);
+        if (environmentp (t))
+        {
+            environment = t;
+            args = cdr (args);
+        }
+        else
+        {
+            environment = lx_make_environment (sx_end_of_list);
+        }
     }
     else
     {
-        environment = lx_make_environment ();
+        environment = env;
     }
 
     arguments = car (args);
@@ -160,47 +147,33 @@ static sexpr make_lambda (unsigned int type, sexpr args)
     lx->type      = type;
     lx->arguments = 0;
 
-    if (consp (arguments))
-    {
-        t = arguments;
-
-        while (consp (t))
-        {
-            lx->arguments++;
-            t = cdr (t);
-        }
-    }
-    else if (integerp (arguments))
-    {
-        lx->arguments = sx_integer (arguments);
-    }
-
-    lx->code = lx_code (environment, arguments, code);
+    lx->arguments = arguments;
+    lx->code = lx_code (&environment, arguments, code);
     lx->environment = environment;
 
     return (sexpr)lx;
 }
 
-sexpr lx_lambda (sexpr expression)
+sexpr lx_lambda (sexpr expression, sexpr environment)
 {
-    return lambda_unserialise (expression);
+    return make_lambda (lambda_type_identifier, expression, environment);
 }
 
-sexpr lx_mu (sexpr expression)
+sexpr lx_mu (sexpr expression, sexpr environment)
 {
-    return mu_unserialise (expression);
+    return make_lambda (mu_type_identifier, expression, environment);
 }
 
 static sexpr lambda_serialise (sexpr lambda)
 {
     struct lambda *lx = (struct lambda *)lambda;
 
-    return cons (lx->environment, cons (make_integer(lx->arguments), lx->code));
+    return cons (lx->environment, cons (lx->arguments, lx->code));
 }
 
 static sexpr lambda_unserialise (sexpr lambda)
 {
-    return make_lambda (lambda_type_identifier, lambda);
+    return make_lambda (lambda_type_identifier, lambda, sx_nonexistent);
 }
 
 static void lambda_tag (sexpr lambda)
@@ -227,7 +200,7 @@ static sexpr mu_serialise (sexpr mu)
 
 static sexpr mu_unserialise (sexpr mu)
 {
-    return make_lambda (mu_type_identifier, mu);
+    return make_lambda (mu_type_identifier, mu, sx_nonexistent);
 }
 
 static void mu_tag (sexpr mu)
@@ -256,19 +229,7 @@ static sexpr environment_serialise (sexpr env)
 
 static sexpr environment_unserialise (sexpr env)
 {
-    static struct memory_pool pool
-            = MEMORY_POOL_INITIALISER(sizeof (struct environment));
-    struct environment *rv = get_pool_mem (&pool);
-
-    if (rv == (struct environment *)0)
-    {
-        return sx_nonexistent;
-    }
-
-    rv->type        = environment_type_identifier;
-    rv->environment = env;
-
-    return (sexpr)rv;
+    return lx_make_environment (env);
 }
 
 static void environment_tag (sexpr env)
@@ -295,30 +256,46 @@ static sexpr primitive_serialise (sexpr op)
     switch (p->op)
     {
         case op_lambda:
-            return cons (sym_lambda, sx_end_of_list);
+            return sym_lambda;
         case op_mu:
-            return cons (sym_mu, sx_end_of_list);
+            return sym_mu;
         case op_addition:
-            return cons (sym_plus, sx_end_of_list);
+            return sym_plus;
         case op_subtraction:
-            return cons (sym_minus, sx_end_of_list);
+            return sym_minus;
         case op_multiplication:
-            return cons (sym_multiply, sx_end_of_list);
+            return sym_multiply;
         case op_division:
-            return cons (sym_divide, sx_end_of_list);
+            return sym_divide;
         case op_modulo:
-            return cons (sym_modulo, sx_end_of_list);
+            return sym_modulo;
+        case op_dereference:
+            return sym_dereference;
+        case op_unbound:
+            return sym_unbound;
     }
 
-    return cons (sym_bad_primitive, sx_end_of_list);
+    return sym_bad_primitive;
+}
+
+static sexpr make_primitive (enum primitive_ops rop)
+{
+    static struct memory_pool pool
+            = MEMORY_POOL_INITIALISER(sizeof (struct primitive));
+    struct primitive *p = get_pool_mem (&pool);
+    if (p == (struct primitive *)0)
+    {
+        return sx_nonexistent;
+    }
+    p->type = primitive_type_identifier;
+    p->op   = rop;
+
+    return (sexpr)p;
 }
 
 static sexpr primitive_unserialise (sexpr op)
 {
-    static struct memory_pool pool
-            = MEMORY_POOL_INITIALISER(sizeof (struct primitive));
     enum primitive_ops rop;
-    struct primitive *p;
 
     if (truep(equalp(sym_lambda, op)))
     {
@@ -348,20 +325,20 @@ static sexpr primitive_unserialise (sexpr op)
     {
         rop = op_modulo;
     }
+    else if (truep(equalp(sym_dereference, op)))
+    {
+        rop = op_dereference;
+    }
+    else if (truep(equalp(sym_unbound, op)))
+    {
+        rop = op_unbound;
+    }
     else
     {
         return sx_nonexistent;
     }
 
-    p = get_pool_mem (&pool);
-    if (p == (struct primitive *)0)
-    {
-        return sx_nonexistent;
-    }
-    p->type = primitive_type_identifier;
-    p->op   = rop;
-
-    return (sexpr)p;
+    return make_primitive (rop);
 }
 
 static void primitive_tag (sexpr op)
@@ -378,126 +355,129 @@ static void primitive_call ( void )
 
 static sexpr primitive_equalp (sexpr a, sexpr b)
 {
-    return sx_false;
+    struct primitive *pa = (struct primitive *)a;
+    struct primitive *pb = (struct primitive *)b;
+
+    return (pa->op == pb->op) ? sx_true : sx_false;
 }
 
-static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr env)
+static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 {
     switch (op)
     {
         case op_lambda:
-            return lx_lambda (args);
+            return lx_lambda (args, *env);
         case op_mu:
-            return lx_mu (args);
+            return lx_mu (args, *env);
         case op_addition:
-        {
-            int_pointer_s i = 0;
-
-            for (i = sx_integer(car (args)), args = cdr (args);
-                 consp (args); args = cdr (args))
-            {
-                i += sx_integer(car (args));
-            }
-
-            return make_integer(i);
-        }
         case op_subtraction:
-        {
-            int_pointer_s i = 0;
-
-            for (i = sx_integer(car (args)), args = cdr (args);
-                 consp (args); args = cdr (args))
-            {
-                i -= sx_integer(car (args));
-            }
-
-            return make_integer(i);
-        }
         case op_multiplication:
-        {
-            int_pointer_s i = 0;
-
-            for (i = sx_integer(car (args)), args = cdr (args);
-                 consp (args); args = cdr (args))
-            {
-                i *= sx_integer(car (args));
-            }
-
-            return make_integer(i);
-        }
         case op_division:
-        {
-            int_pointer_s i = 0;
-
-            for (i = sx_integer(car (args)), args = cdr (args);
-                 consp (args); args = cdr (args))
-            {
-                i /= sx_integer(car (args));
-            }
-
-            return make_integer(i);
-        }
         case op_modulo:
         {
             int_pointer_s i = 0;
+            sexpr ta = args, ti = lx_eval (car (ta), env);
 
-            for (i = sx_integer(car (args)), args = cdr (args);
-                 consp (args); args = cdr (args))
+            if (!integerp (ti))
             {
-                i %= sx_integer(car (args));
+                return cons (make_primitive (op), args);
+            }
+
+            i = sx_integer(ti);
+            ta = cdr (ta);
+
+            while (consp (ta))
+            {
+                ti = lx_eval (car (ta), env);
+
+                if (!integerp (ti))
+                {
+                    return cons (make_primitive (op), args);
+                }
+
+                switch (op)
+                {
+                    case op_addition:
+                        i += sx_integer(ti);
+                        break;
+                    case op_subtraction:
+                        i -= sx_integer(ti);
+                        break;
+                    case op_multiplication:
+                        i *= sx_integer(ti);
+                        break;
+                    case op_division:
+                        i /= sx_integer(ti);
+                        break;
+                    case op_modulo:
+                        i %= sx_integer(ti);
+                        break;
+                    default:
+                        break;
+                }
+
+                ta = cdr (ta);
             }
 
             return make_integer(i);
+        }
+        case op_dereference:
+        {
+            sexpr r = lx_environment_lookup (*env, args);
+
+            return nexp (r) ? cons (make_primitive (op_dereference), args) : r;
+        }
+        case op_unbound:
+        {
+            return make_primitive (op_unbound);
         }
     }
 
     return args;
 }
 
-sexpr lx_apply_lambda (unsigned int argnum, sexpr code, sexpr env, sexpr args)
+sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
 {
-    int argc = 0;
-    sexpr t = args, rv = sx_nonexistent;
+    sexpr t, tb = args, rv = sx_nonexistent, n = argspec;
+
+    while (consp (tb))
+    {
+        t   = car (n);
+
+        env = lx_environment_unbind (env, t);
+        env = lx_environment_bind   (env, t, car (tb));
+
+        tb  = cdr (tb);
+        n   = cdr (n);
+    }
+
+/*    sx_write (stdio, env);*/
+
+    t = code;
 
     while (consp (t))
     {
-        argc++;
+        rv = lx_eval (car (t), &env);
 
         t = cdr (t);
     }
 
-    if ((argnum == 0) && (argc == 0))
+    if (consp (n))
     {
-        t = code;
-
-        while (consp (t))
-        {
-            argc++;
-
-            rv = lx_eval (car (t), env);
-
-            t = cdr (t);
-        }
+        return lx_lambda (cons (n, cons (rv, sx_end_of_list)), env);
     }
 
     return rv;
 }
 
-sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
+sexpr lx_apply (sexpr sx, sexpr args, sexpr *env)
 {
     if (lambdap (sx))
     {
         struct lambda *p = (struct lambda *)sx;
-        sexpr s = lx_apply_lambda (p->arguments, p->code, env, args);
+        sexpr s = lx_apply_lambda (p->arguments, p->code, *env, args);
 
-        if (nexp (s))
-        {
-            return sx;
-        }
-        else
-        {
-            return s;
-        }
+        return nexp (s) ? sx : s;
     }
     else if (mup (sx))
     {
@@ -507,14 +487,27 @@ sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
     {
         struct primitive *p = (struct primitive *)sx;
 
-        return lx_apply_primitive (p->op, args, env);
+/*        sx_write (stdio, cons (*env, cons (sx, args)));*/
+
+        sx = lx_apply_primitive (p->op, args, env);
+
+/*        sx_write (stdio, sx);*/
+
+        return sx;
     }
 
     return sx_nonexistent;
 }
 
-sexpr lx_eval_compile (sexpr sx, sexpr env, char eval)
+sexpr lx_eval (sexpr sx, sexpr *env)
 {
+    if (symbolp (sx))
+    {
+        sexpr sxt = primitive_unserialise (sx);
+
+        sx = nexp (sxt) ? cons (make_primitive (op_dereference), sx) : sxt;
+    }
+
     while (consp (sx))
     {
         sexpr sxcar = car (sx);
@@ -522,24 +515,29 @@ sexpr lx_eval_compile (sexpr sx, sexpr env, char eval)
 
         if (symbolp (sxcar))
         {
-            sx = primitive_unserialise (sxcar);
-
-            if (nexp (sx))
-            {
-                sx = cons (lx_environment_lookup (env, sxcar), sxcdr);
-            }
-            else
-            {
-                sx = cons (sx, sxcdr);
-            }
+            sx = cons (lx_eval (sxcar, env), sxcdr);
         }
-        else if (eval && (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar)))
+        else if (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar))
         {
-            sx = lx_apply (sxcar, sxcdr, env);
+            sexpr r = lx_apply (sxcar, sxcdr, env);
+
+            if (truep (equalp (r, sx)))
+            {
+                return sx;
+            }
+
+            sx = r;
         }
         else if (consp (sxcar))
         {
-            sx = cons (lx_eval (sxcar, env), sxcdr);
+            sexpr r = cons (lx_eval (sxcar, env), sxcdr);
+
+            if (truep (equalp (r, sx)))
+            {
+                return sx;
+            }
+
+            sx = r;
         }
         else
         {
@@ -550,19 +548,21 @@ sexpr lx_eval_compile (sexpr sx, sexpr env, char eval)
     return sx;
 }
 
-sexpr lx_eval (sexpr sx, sexpr env)
+sexpr lx_make_environment (sexpr env)
 {
-    return lx_eval_compile (sx, env, 1);
-}
+    static struct memory_pool pool
+            = MEMORY_POOL_INITIALISER(sizeof (struct environment));
+    struct environment *rv = get_pool_mem (&pool);
 
-sexpr lx_compile (sexpr sx, sexpr env)
-{
-    return lx_eval_compile (sx, env, 0);
-}
+    if (rv == (struct environment *)0)
+    {
+        return sx_nonexistent;
+    }
 
-sexpr lx_make_environment ()
-{
-    return environment_unserialise (sx_end_of_list);
+    rv->type        = environment_type_identifier;
+    rv->environment = env;
+
+    return (sexpr)rv;
 }
 
 sexpr lx_environment_lookup (sexpr env, sexpr key)
@@ -586,4 +586,43 @@ sexpr lx_environment_lookup (sexpr env, sexpr key)
     }
 
     return sx_nonexistent;
+}
+
+sexpr lx_environment_unbind (sexpr env, sexpr key)
+{
+    sexpr r = sx_end_of_list;
+
+    if (environmentp (env))
+    {
+        struct environment *t = (struct environment *)env;
+        sexpr sx = t->environment;
+
+        while (consp (sx))
+        {
+            sexpr sxt = car (sx);
+
+            if (falsep (equalp (car (sxt), key)))
+            {
+                r = cons (sxt, r);
+            }
+
+            sx = cdr (sx);
+        }
+    }
+
+    return lx_make_environment (sx_reverse (r));
+}
+
+sexpr lx_environment_bind (sexpr env, sexpr key, sexpr value)
+{
+    sexpr r = sx_end_of_list;
+
+    if (environmentp (env))
+    {
+        struct environment *t = (struct environment *)env;
+
+        r = cons (cons(key, value), t->environment);
+    }
+
+    return lx_make_environment (r);
 }

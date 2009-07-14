@@ -47,13 +47,14 @@ extern "C" {
 
 void initialise_seteh ( void );
 
-sexpr lx_lambda             (sexpr sx);
-sexpr lx_mu                 (sexpr sx);
-sexpr lx_apply              (sexpr sx, sexpr args, sexpr env);
-sexpr lx_compile            (sexpr sx, sexpr env);
-sexpr lx_eval               (sexpr sx, sexpr env);
-sexpr lx_make_environment   ();
+sexpr lx_lambda             (sexpr sx, sexpr env);
+sexpr lx_mu                 (sexpr sx, sexpr env);
+sexpr lx_apply              (sexpr sx, sexpr args, sexpr *env);
+sexpr lx_eval               (sexpr sx, sexpr *env);
+sexpr lx_make_environment   (sexpr env);
 sexpr lx_environment_lookup (sexpr env, sexpr key);
+sexpr lx_environment_unbind (sexpr env, sexpr key);
+sexpr lx_environment_bind   (sexpr env, sexpr key, sexpr value);
 
 #ifdef __cplusplus
 }
