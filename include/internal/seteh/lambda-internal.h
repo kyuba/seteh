@@ -51,7 +51,14 @@ enum primitive_ops
     op_division,
     op_modulo,
     op_dereference,
-    op_unbound
+    op_unbound,
+    op_equalp,
+    op_if,
+    op_gt,
+    op_gte,
+    op_lt,
+    op_lte,
+    op_equals
 };
 
 struct lambda
@@ -81,6 +88,7 @@ struct primitive
     define_symbol(s,v)
 
 define_symbol (sym_bad_primitive,        "bad-primitive");
+define_symbol (sym_if_alt,               "if");
 
 define_primitive (op_lambda,         sym_lambda,      "lambda");
 define_primitive (op_mu,             sym_mu,          "mu");
@@ -91,6 +99,13 @@ define_primitive (op_division,       sym_divide,      "/");
 define_primitive (op_modulo,         sym_modulo,      "%");
 define_primitive (op_dereference,    sym_dereference, "dereference");
 define_primitive (op_unbound,        sym_unbound,     "unbound");
+define_primitive (op_equalp,         sym_equalp,      "equal?");
+define_primitive (op_if,             sym_if,          "?");
+define_primitive (op_gt,             sym_gt,          ">?");
+define_primitive (op_gte,            sym_gte,         ">=?");
+define_primitive (op_lt,             sym_lt,          "<?");
+define_primitive (op_lte,            sym_lte,         "<=?");
+define_primitive (op_equals,         sym_equals,      "=?");
 
 /* struct sexpr_io *stdio;*/
 

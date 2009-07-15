@@ -262,6 +262,13 @@ static sexpr primitive_serialise (sexpr op)
         primitive_serialise_case (op_modulo,         sym_modulo);
         primitive_serialise_case (op_dereference,    sym_dereference);
         primitive_serialise_case (op_unbound,        sym_unbound);
+        primitive_serialise_case (op_equalp,         sym_equalp);
+        primitive_serialise_case (op_if,             sym_if);
+        primitive_serialise_case (op_gt,             sym_gt);
+        primitive_serialise_case (op_gte,            sym_gte);
+        primitive_serialise_case (op_lt,             sym_lt);
+        primitive_serialise_case (op_lte,            sym_lte);
+        primitive_serialise_case (op_equals,         sym_equals);
     }
 
     return sym_bad_primitive;
@@ -282,6 +289,13 @@ static sexpr make_primitive (enum primitive_ops rop)
         make_primitive_case (op_modulo);
         make_primitive_case (op_dereference);
         make_primitive_case (op_unbound);
+        make_primitive_case (op_equalp);
+        make_primitive_case (op_if);
+        make_primitive_case (op_gt);
+        make_primitive_case (op_gte);
+        make_primitive_case (op_lt);
+        make_primitive_case (op_lte);
+        make_primitive_case (op_equals);
     }
 
      return sx_nonexistent;
@@ -304,6 +318,15 @@ static sexpr primitive_unserialise (sexpr op)
     primitive_unserialise_map (sym_modulo,      op, op_modulo);
     primitive_unserialise_map (sym_dereference, op, op_dereference);
     primitive_unserialise_map (sym_unbound,     op, op_unbound);
+    primitive_unserialise_map (sym_equalp,      op, op_equalp);
+    primitive_unserialise_map (sym_if,          op, op_if);
+    primitive_unserialise_map (sym_gt,          op, op_gt);
+    primitive_unserialise_map (sym_gte,         op, op_gte);
+    primitive_unserialise_map (sym_lt,          op, op_lt);
+    primitive_unserialise_map (sym_lte,         op, op_lte);
+    primitive_unserialise_map (sym_equals,      op, op_equals);
+
+    primitive_unserialise_map (sym_if_alt,      op, op_if);
 
     return sx_nonexistent;
 }
@@ -385,6 +408,48 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
         case op_unbound:
         {
             return make_primitive (op_unbound);
+        }
+        case op_if:
+        {
+            return lx_eval
+                        ((truep(lx_eval (car (args), env)) ?
+                            car (cdr (args)) :
+                            car (cdr (cdr (args)))),
+                        env);
+        }
+        case op_equalp:
+        {
+            return equalp (car (args), car (cdr (args)));
+        }
+        case op_gt:
+        {
+            sexpr a = car (args), b = car (cdr (args));
+
+            return (sx_integer(a) > sx_integer(b)) ? sx_true : sx_false;
+        }
+        case op_gte:
+        {
+            sexpr a = car (args), b = car (cdr (args));
+
+            return (sx_integer(a) >= sx_integer(b)) ? sx_true : sx_false;
+        }
+        case op_lt:
+        {
+            sexpr a = car (args), b = car (cdr (args));
+
+            return (sx_integer(a) < sx_integer(b)) ? sx_true : sx_false;
+        }
+        case op_lte:
+        {
+            sexpr a = car (args), b = car (cdr (args));
+
+            return (sx_integer(a) <= sx_integer(b)) ? sx_true : sx_false;
+        }
+        case op_equals:
+        {
+            sexpr a = car (args), b = car (cdr (args));
+
+            return (sx_integer(a) == sx_integer(b)) ? sx_true : sx_false;
         }
     }
 
