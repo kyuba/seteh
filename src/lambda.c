@@ -55,9 +55,6 @@ static sexpr environment_equalp      (sexpr a, sexpr b);
 
 static sexpr primitive_serialise     (sexpr op);
 static sexpr primitive_unserialise   (sexpr op);
-static void  primitive_tag           (sexpr op);
-static void  primitive_destroy       (sexpr op);
-static void  primitive_call          ( void );
 static sexpr primitive_equalp        (sexpr a, sexpr b);
 
 void initialise_seteh ( void )
@@ -85,8 +82,7 @@ void initialise_seteh ( void )
         sx_register_type
                 (primitive_type_identifier,
                  primitive_serialise, primitive_unserialise,
-                 primitive_tag, primitive_destroy,
-                 primitive_call, primitive_equalp);
+                 (void *)0, (void *)0, (void *)0, primitive_equalp);
     }
 }
 
@@ -249,108 +245,67 @@ static sexpr environment_equalp (sexpr a, sexpr b)
     return sx_false;
 }
 
+#define primitive_serialise_case(op,sym) case op: return sym
+
 static sexpr primitive_serialise (sexpr op)
 {
     struct primitive *p = (struct primitive *)op;
 
     switch (p->op)
     {
-        case op_lambda:
-            return sym_lambda;
-        case op_mu:
-            return sym_mu;
-        case op_addition:
-            return sym_plus;
-        case op_subtraction:
-            return sym_minus;
-        case op_multiplication:
-            return sym_multiply;
-        case op_division:
-            return sym_divide;
-        case op_modulo:
-            return sym_modulo;
-        case op_dereference:
-            return sym_dereference;
-        case op_unbound:
-            return sym_unbound;
+        primitive_serialise_case (op_lambda,         sym_lambda);
+        primitive_serialise_case (op_mu,             sym_mu);
+        primitive_serialise_case (op_addition,       sym_plus);
+        primitive_serialise_case (op_subtraction,    sym_minus);
+        primitive_serialise_case (op_multiplication, sym_multiply);
+        primitive_serialise_case (op_division,       sym_divide);
+        primitive_serialise_case (op_modulo,         sym_modulo);
+        primitive_serialise_case (op_dereference,    sym_dereference);
+        primitive_serialise_case (op_unbound,        sym_unbound);
     }
 
     return sym_bad_primitive;
 }
 
+#define make_primitive_case(op) case op: return sx_p_ ## op
+
 static sexpr make_primitive (enum primitive_ops rop)
 {
-    static struct memory_pool pool
-            = MEMORY_POOL_INITIALISER(sizeof (struct primitive));
-    struct primitive *p = get_pool_mem (&pool);
-    if (p == (struct primitive *)0)
+    switch (rop)
     {
-        return sx_nonexistent;
+        make_primitive_case (op_lambda);
+        make_primitive_case (op_mu);
+        make_primitive_case (op_addition);
+        make_primitive_case (op_subtraction);
+        make_primitive_case (op_multiplication);
+        make_primitive_case (op_division);
+        make_primitive_case (op_modulo);
+        make_primitive_case (op_dereference);
+        make_primitive_case (op_unbound);
     }
-    p->type = primitive_type_identifier;
-    p->op   = rop;
 
-    return (sexpr)p;
+     return sx_nonexistent;
 }
+
+#define primitive_unserialise_map(s,cop,op) \
+    if (truep(equalp(s, cop)))\
+    {\
+        return make_primitive(op);\
+    }\
 
 static sexpr primitive_unserialise (sexpr op)
 {
-    enum primitive_ops rop;
+    primitive_unserialise_map (sym_lambda,      op, op_lambda);
+    primitive_unserialise_map (sym_mu,          op, op_mu);
+    primitive_unserialise_map (sym_plus,        op, op_addition);
+    primitive_unserialise_map (sym_minus,       op, op_subtraction);
+    primitive_unserialise_map (sym_multiply,    op, op_multiplication);
+    primitive_unserialise_map (sym_divide,      op, op_division);
+    primitive_unserialise_map (sym_modulo,      op, op_modulo);
+    primitive_unserialise_map (sym_dereference, op, op_dereference);
+    primitive_unserialise_map (sym_unbound,     op, op_unbound);
 
-    if (truep(equalp(sym_lambda, op)))
-    {
-        rop = op_lambda;
-    }
-    else if (truep(equalp(sym_mu, op)))
-    {
-        rop = op_mu;
-    }
-    else if (truep(equalp(sym_plus, op)))
-    {
-        rop = op_addition;
-    }
-    else if (truep(equalp(sym_minus, op)))
-    {
-        rop = op_subtraction;
-    }
-    else if (truep(equalp(sym_multiply, op)))
-    {
-        rop = op_multiplication;
-    }
-    else if (truep(equalp(sym_divide, op)))
-    {
-        rop = op_division;
-    }
-    else if (truep(equalp(sym_modulo, op)))
-    {
-        rop = op_modulo;
-    }
-    else if (truep(equalp(sym_dereference, op)))
-    {
-        rop = op_dereference;
-    }
-    else if (truep(equalp(sym_unbound, op)))
-    {
-        rop = op_unbound;
-    }
-    else
-    {
-        return sx_nonexistent;
-    }
-
-    return make_primitive (rop);
-}
-
-static void primitive_tag (sexpr op)
-{
-}
-
-static void primitive_destroy (sexpr op)
-{
-}
-
-static void primitive_call ( void )
-{
+    return sx_nonexistent;
 }
 
 static sexpr primitive_equalp (sexpr a, sexpr b)
@@ -436,7 +391,7 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
     return args;
 }
 
-sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
+static sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
 {
     sexpr t, tb = args, rv = sx_nonexistent, n = argspec;
 
