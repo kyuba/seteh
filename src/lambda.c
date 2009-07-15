@@ -57,6 +57,13 @@ static sexpr primitive_serialise     (sexpr op);
 static sexpr primitive_unserialise   (sexpr op);
 static sexpr primitive_equalp        (sexpr a, sexpr b);
 
+static sexpr promise_serialise       (sexpr env);
+static sexpr promise_unserialise     (sexpr env);
+static void  promise_tag             (sexpr env);
+static void  promise_destroy         (sexpr env);
+static void  promise_call            ( void );
+static sexpr promise_equalp          (sexpr a, sexpr b);
+
 void initialise_seteh ( void )
 {
     if (!initialised)
@@ -83,12 +90,18 @@ void initialise_seteh ( void )
                 (primitive_type_identifier,
                  primitive_serialise, primitive_unserialise,
                  (void *)0, (void *)0, (void *)0, primitive_equalp);
+
+        sx_register_type
+                (promise_type_identifier,
+                 promise_serialise, promise_unserialise,
+                 promise_tag, promise_destroy,
+                 promise_call, promise_equalp);
     }
 }
 
 static sexpr lx_code (sexpr *environment, sexpr args, sexpr code)
 {
-    sexpr rv = sx_end_of_list, n = args;
+    sexpr n = args, t, e;
 
     while (consp (n))
     {
@@ -97,14 +110,14 @@ static sexpr lx_code (sexpr *environment, sexpr args, sexpr code)
         n = car (n);
     }
 
-    while (consp (code))
-    {
-        rv = cons (lx_eval (car (code), environment), rv);
+    t = code;
 
-        code = cdr (code);
+    while (e = cdr (t), consp (e))
+    {
+        t = e;
     }
 
-    return sx_reverse (rv);
+    return cons (lx_eval (car (t), environment), sx_end_of_list);
 }
 
 static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
@@ -269,6 +282,9 @@ static sexpr primitive_serialise (sexpr op)
         primitive_serialise_case (op_lt,             sym_lt);
         primitive_serialise_case (op_lte,            sym_lte);
         primitive_serialise_case (op_equals,         sym_equals);
+        primitive_serialise_case (op_delay,          sym_delay);
+        primitive_serialise_case (op_force,          sym_force);
+        primitive_serialise_case (op_eval,           sym_eval);
     }
 
     return sym_bad_primitive;
@@ -296,6 +312,9 @@ static sexpr make_primitive (enum primitive_ops rop)
         make_primitive_case (op_lt);
         make_primitive_case (op_lte);
         make_primitive_case (op_equals);
+        make_primitive_case (op_delay);
+        make_primitive_case (op_force);
+        make_primitive_case (op_eval);
     }
 
      return sx_nonexistent;
@@ -325,6 +344,9 @@ static sexpr primitive_unserialise (sexpr op)
     primitive_unserialise_map (sym_lt,          op, op_lt);
     primitive_unserialise_map (sym_lte,         op, op_lte);
     primitive_unserialise_map (sym_equals,      op, op_equals);
+    primitive_unserialise_map (sym_delay,       op, op_delay);
+    primitive_unserialise_map (sym_force,       op, op_force);
+    primitive_unserialise_map (sym_eval,        op, op_eval);
 
     primitive_unserialise_map (sym_if_alt,      op, op_if);
 
@@ -337,6 +359,68 @@ static sexpr primitive_equalp (sexpr a, sexpr b)
     struct primitive *pb = (struct primitive *)b;
 
     return (pa->op == pb->op) ? sx_true : sx_false;
+}
+
+sexpr lx_make_promise (sexpr code, sexpr environment)
+{
+    static struct memory_pool pool
+            = MEMORY_POOL_INITIALISER(sizeof (struct promise));
+    struct promise *p = get_pool_mem (&pool);
+
+    if (p == (struct promise *)0)
+    {
+        return sx_nonexistent;
+    }
+
+    p->type        = promise_type_identifier;
+    p->ptype       = pt_manual;
+    p->environment = environment;
+    p->code        = code;
+
+    return (sexpr)p;
+}
+
+static sexpr lx_make_automatic_promise (sexpr code, sexpr environment)
+{
+    struct promise *p = (struct promise *)lx_make_promise (code, environment);
+
+    if (p == (struct promise *)0)
+    {
+        return sx_nonexistent;
+    }
+
+    p->ptype       = pt_automatic;
+
+    return (sexpr)p;
+}
+
+static sexpr promise_serialise (sexpr promise)
+{
+    struct promise *p = (struct promise *)promise;
+
+    return cons (p->environment, p->code);
+}
+
+static sexpr promise_unserialise (sexpr promise)
+{
+    return lx_make_promise (car (promise), cdr (promise));
+}
+
+static void promise_tag (sexpr promise)
+{
+}
+
+static void promise_destroy (sexpr promise)
+{
+}
+
+static void promise_call ( void )
+{
+}
+
+static sexpr promise_equalp (sexpr a, sexpr b)
+{
+    return sx_false;
 }
 
 static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
@@ -419,17 +503,13 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 
             }
 
-            return lx_eval
-                        ((truep(cond) ?
+            return truep(cond) ?
                             car (cdr (args)) :
-                            car (cdr (cdr (args)))),
-                        env);
+                            car (cdr (cdr (args)));
         }
         case op_equalp:
-        {
             return equalp (lx_eval (car (args), env),
                            lx_eval (car (cdr (args)), env));
-        }
         case op_gt:
         case op_gte:
         case op_lt:
@@ -462,6 +542,18 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
                     return sx_nonexistent;
             }
         }
+        case op_delay:
+            return lx_make_promise (args, *env);
+        case op_force:
+            if (promisep(args))
+            {
+                struct promise *p = (struct promise *)args;
+
+                sexpr e = p->environment;
+                return lx_eval (p->code, &e);
+            }
+        case op_eval:
+            return lx_eval (args, env);
     }
 
     return args;
@@ -487,16 +579,19 @@ static sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
 
     t = code;
 
-    while (consp (t))
+    while (e = cdr (t), consp (e))
     {
-        rv = lx_eval (car (t), &env);
-
-        t = cdr (t);
+        t = e;
     }
 
     if (consp (n))
     {
         return lx_lambda (cons (n, cons (rv, sx_end_of_list)), env);
+    }
+    else
+    {
+/*        rv = lx_eval (car (t), &env);*/
+        rv = lx_make_automatic_promise (car (t), env);
     }
 
     return rv;
@@ -527,31 +622,62 @@ sexpr lx_apply (sexpr sx, sexpr args, sexpr *env)
 
         return sx;
     }
+    else if (promisep (sx))
+    {
+        struct promise *p = (struct promise *)sx;
+
+        if (p->ptype == pt_automatic)
+        {
+            sexpr e = p->environment;
+            return lx_eval (p->code, &e);
+        }
+
+        return sx;
+    }
 
     return sx_nonexistent;
 }
 
 sexpr lx_eval (sexpr sx, sexpr *env)
 {
-    if (symbolp (sx))
-    {
-        sexpr sxt = primitive_unserialise (sx);
+    sexpr sxcar, sxcdr, r, e;
 
-        sx = nexp (sxt) ? cons (make_primitive (op_dereference), sx) : sxt;
-    }
-
-    while (consp (sx))
+    while (consp (sx) || promisep (sx) || symbolp (sx))
     {
-        sexpr sxcar = car (sx);
-        sexpr sxcdr = cdr (sx);
+        if (symbolp (sx))
+        {
+            sexpr sxt = primitive_unserialise (sx);
+
+            sx = nexp (sxt) ? cons (make_primitive (op_dereference), sx) : sxt;
+
+            continue;
+        }
+        else if (promisep (sx))
+        {
+            struct promise *p = (struct promise *)sx;
+
+            if (p->ptype == pt_automatic)
+            {
+                e = p->environment;
+                env = &e;
+                sx = p->code;
+                continue;
+            }
+
+            return sx;
+        }
+
+        sxcar = car (sx);
+        sxcdr = cdr (sx);
 
         if (symbolp (sxcar))
         {
             sx = cons (lx_eval (sxcar, env), sxcdr);
         }
-        else if (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar))
+        else if (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar) ||
+                 promisep (sxcar))
         {
-            sexpr r = lx_apply (sxcar, sxcdr, env);
+            r = lx_apply (sxcar, sxcdr, env);
 
             if (truep (equalp (r, sx)))
             {
@@ -562,7 +688,7 @@ sexpr lx_eval (sexpr sx, sexpr *env)
         }
         else if (consp (sxcar))
         {
-            sexpr r = cons (lx_eval (sxcar, env), sxcdr);
+            r = cons (lx_eval (sxcar, env), sxcdr);
 
             if (truep (equalp (r, sx)))
             {
@@ -642,7 +768,7 @@ sexpr lx_environment_unbind (sexpr env, sexpr key)
         }
     }
 
-    return lx_make_environment (sx_reverse (r));
+    return lx_make_environment (r);
 }
 
 sexpr lx_environment_bind (sexpr env, sexpr key, sexpr value)

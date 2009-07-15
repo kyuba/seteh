@@ -39,11 +39,13 @@ extern "C" {
 #define mu_type_identifier          0x03bc
 #define environment_type_identifier 0x03b5
 #define primitive_type_identifier   0x03c6
+#define promise_type_identifier     0x03c7
 
 #define lambdap(sx)      sx_customp(sx,lambda_type_identifier)
 #define mup(sx)          sx_customp(sx,mu_type_identifier)
 #define environmentp(sx) sx_customp(sx,environment_type_identifier)
 #define primitivep(sx)   sx_customp(sx,primitive_type_identifier)
+#define promisep(sx)     sx_customp(sx,promise_type_identifier)
 
 void initialise_seteh ( void );
 
@@ -55,6 +57,7 @@ sexpr lx_make_environment   (sexpr env);
 sexpr lx_environment_lookup (sexpr env, sexpr key);
 sexpr lx_environment_unbind (sexpr env, sexpr key);
 sexpr lx_environment_bind   (sexpr env, sexpr key, sexpr value);
+sexpr lx_make_promise       (sexpr code, sexpr environment);
 
 #ifdef __cplusplus
 }

@@ -58,7 +58,16 @@ enum primitive_ops
     op_gte,
     op_lt,
     op_lte,
-    op_equals
+    op_equals,
+    op_delay,
+    op_force,
+    op_eval
+};
+
+enum promise_type
+{
+    pt_automatic,
+    pt_manual
 };
 
 struct lambda
@@ -79,6 +88,14 @@ struct primitive
 {
     unsigned int type;
     enum primitive_ops op;
+};
+
+struct promise
+{
+    unsigned int type;
+    enum promise_type ptype;
+    sexpr environment;
+    sexpr code;
 };
 
 #define define_primitive(o,s,v) \
@@ -106,6 +123,9 @@ define_primitive (op_gte,            sym_gte,         ">=?");
 define_primitive (op_lt,             sym_lt,          "<?");
 define_primitive (op_lte,            sym_lte,         "<=?");
 define_primitive (op_equals,         sym_equals,      "=?");
+define_primitive (op_delay,          sym_delay,       "delay");
+define_primitive (op_force,          sym_force,       "force");
+define_primitive (op_eval,           sym_eval,        "eval");
 
 /* struct sexpr_io *stdio;*/
 
