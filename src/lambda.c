@@ -411,45 +411,56 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
         }
         case op_if:
         {
+            sexpr cond = lx_eval (car (args), env);
+
+            if (!truep (cond) && !falsep (cond))
+            {
+                return cons (make_primitive (op_if), args);
+
+            }
+
             return lx_eval
-                        ((truep(lx_eval (car (args), env)) ?
+                        ((truep(cond) ?
                             car (cdr (args)) :
                             car (cdr (cdr (args)))),
                         env);
         }
         case op_equalp:
         {
-            return equalp (car (args), car (cdr (args)));
+            return equalp (lx_eval (car (args), env),
+                           lx_eval (car (cdr (args)), env));
         }
         case op_gt:
-        {
-            sexpr a = car (args), b = car (cdr (args));
-
-            return (sx_integer(a) > sx_integer(b)) ? sx_true : sx_false;
-        }
         case op_gte:
-        {
-            sexpr a = car (args), b = car (cdr (args));
-
-            return (sx_integer(a) >= sx_integer(b)) ? sx_true : sx_false;
-        }
         case op_lt:
-        {
-            sexpr a = car (args), b = car (cdr (args));
-
-            return (sx_integer(a) < sx_integer(b)) ? sx_true : sx_false;
-        }
         case op_lte:
-        {
-            sexpr a = car (args), b = car (cdr (args));
-
-            return (sx_integer(a) <= sx_integer(b)) ? sx_true : sx_false;
-        }
         case op_equals:
         {
-            sexpr a = car (args), b = car (cdr (args));
+            sexpr a = lx_eval (car (args), env),
+                  b = lx_eval (car (cdr (args)), env);
 
-            return (sx_integer(a) == sx_integer(b)) ? sx_true : sx_false;
+            if (!integerp(a) || !integerp(b))
+            {
+                return cons (make_primitive (op),
+                             cons (a,
+                                   cons (b, sx_end_of_list)));
+            }
+
+            switch (op)
+            {
+                case op_gt:
+                    return (sx_integer(a) > sx_integer(b))? sx_true : sx_false;
+                case op_gte:
+                    return (sx_integer(a) >= sx_integer(b))? sx_true : sx_false;
+                case op_lt:
+                    return (sx_integer(a) < sx_integer(b))? sx_true : sx_false;
+                case op_lte:
+                    return (sx_integer(a) <= sx_integer(b))? sx_true : sx_false;
+                case op_equals:
+                    return (sx_integer(a) == sx_integer(b))? sx_true : sx_false;
+                default:
+                    return sx_nonexistent;
+            }
         }
     }
 
@@ -458,14 +469,15 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 
 static sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
 {
-    sexpr t, tb = args, rv = sx_nonexistent, n = argspec;
+    sexpr t, e, tb = args, rv = sx_nonexistent, n = argspec;
 
     while (consp (tb))
     {
         t   = car (n);
+        e   = lx_eval (car (tb), &env);
 
         env = lx_environment_unbind (env, t);
-        env = lx_environment_bind   (env, t, car (tb));
+        env = lx_environment_bind   (env, t, e);
 
         tb  = cdr (tb);
         n   = cdr (n);
