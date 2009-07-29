@@ -78,6 +78,13 @@ struct lambda
     sexpr environment;
 };
 
+struct foreign_lambda
+{
+    unsigned int type;
+    sexpr name;
+    sexpr (*f) (sexpr, sexpr *);
+};
+
 struct environment
 {
     unsigned int type;

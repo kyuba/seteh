@@ -30,6 +30,13 @@
 
 struct sexpr_io *stdio;
 
+define_symbol (sym_f, "f");
+
+sexpr f (sexpr args, sexpr *environment)
+{
+    return cons (make_string ("wheeeeoooo"), args);
+}
+
 int cmain ()
 {
     struct io *in       = io_open_read        ("tests/data/lambda-1.sx");
@@ -42,6 +49,8 @@ int cmain ()
     initialise_seteh ();
 
     env = lx_environment_bind (env, make_symbol ("f"), make_integer (2));
+    env = lx_environment_bind (env, make_symbol ("fx"),
+                               lx_foreign_lambda (sym_f, f));
 
     while (!eofp(sx = sx_read (io)))
     {

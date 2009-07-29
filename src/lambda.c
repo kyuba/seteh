@@ -32,37 +32,51 @@
 
 static char initialised = 0;
 
-static sexpr lambda_serialise        (sexpr lambda);
-static sexpr lambda_unserialise      (sexpr lambda);
-static void  lambda_tag              (sexpr lambda);
-static void  lambda_destroy          (sexpr lambda);
-static void  lambda_call             ( void );
-static sexpr lambda_equalp           (sexpr a, sexpr b);
+static sexpr lambda_serialise           (sexpr lambda);
+static sexpr lambda_unserialise         (sexpr lambda);
+static void  lambda_tag                 (sexpr lambda);
+static void  lambda_destroy             (sexpr lambda);
+static void  lambda_call                ( void );
+static sexpr lambda_equalp              (sexpr a, sexpr b);
 
-static sexpr mu_serialise            (sexpr mu);
-static sexpr mu_unserialise          (sexpr mu);
-static void  mu_tag                  (sexpr mu);
-static void  mu_destroy              (sexpr mu);
-static void  mu_call                 ( void );
-static sexpr mu_equalp               (sexpr a, sexpr b);
+static sexpr mu_serialise               (sexpr mu);
+static sexpr mu_unserialise             (sexpr mu);
+static void  mu_tag                     (sexpr mu);
+static void  mu_destroy                 (sexpr mu);
+static void  mu_call                    ( void );
+static sexpr mu_equalp                  (sexpr a, sexpr b);
 
-static sexpr environment_serialise   (sexpr env);
-static sexpr environment_unserialise (sexpr env);
-static void  environment_tag         (sexpr env);
-static void  environment_destroy     (sexpr env);
-static void  environment_call        ( void );
-static sexpr environment_equalp      (sexpr a, sexpr b);
+static sexpr foreign_lambda_serialise   (sexpr lambda);
+static sexpr foreign_lambda_unserialise (sexpr lambda);
+static void  foreign_lambda_tag         (sexpr lambda);
+static void  foreign_lambda_destroy     (sexpr lambda);
+static void  foreign_lambda_call        ( void );
+static sexpr foreign_lambda_equalp      (sexpr a, sexpr b);
 
-static sexpr primitive_serialise     (sexpr op);
-static sexpr primitive_unserialise   (sexpr op);
-static sexpr primitive_equalp        (sexpr a, sexpr b);
+static sexpr foreign_mu_serialise       (sexpr mu);
+static sexpr foreign_mu_unserialise     (sexpr mu);
+static void  foreign_mu_tag             (sexpr mu);
+static void  foreign_mu_destroy         (sexpr mu);
+static void  foreign_mu_call            ( void );
+static sexpr foreign_mu_equalp          (sexpr a, sexpr b);
 
-static sexpr promise_serialise       (sexpr env);
-static sexpr promise_unserialise     (sexpr env);
-static void  promise_tag             (sexpr env);
-static void  promise_destroy         (sexpr env);
-static void  promise_call            ( void );
-static sexpr promise_equalp          (sexpr a, sexpr b);
+static sexpr environment_serialise      (sexpr env);
+static sexpr environment_unserialise    (sexpr env);
+static void  environment_tag            (sexpr env);
+static void  environment_destroy        (sexpr env);
+static void  environment_call           ( void );
+static sexpr environment_equalp         (sexpr a, sexpr b);
+
+static sexpr primitive_serialise        (sexpr op);
+static sexpr primitive_unserialise      (sexpr op);
+static sexpr primitive_equalp           (sexpr a, sexpr b);
+
+static sexpr promise_serialise          (sexpr env);
+static sexpr promise_unserialise        (sexpr env);
+static void  promise_tag                (sexpr env);
+static void  promise_destroy            (sexpr env);
+static void  promise_call               ( void );
+static sexpr promise_equalp             (sexpr a, sexpr b);
 
 void initialise_seteh ( void )
 {
@@ -79,6 +93,18 @@ void initialise_seteh ( void )
                  mu_serialise, mu_unserialise,
                  mu_tag, mu_destroy,
                  mu_call, mu_equalp);
+
+        sx_register_type
+                (foreign_lambda_type_identifier,
+                 foreign_lambda_serialise, foreign_lambda_unserialise,
+                 foreign_lambda_tag, foreign_lambda_destroy,
+                 foreign_lambda_call, foreign_lambda_equalp);
+
+        sx_register_type
+                (foreign_mu_type_identifier,
+                 foreign_mu_serialise, foreign_mu_unserialise,
+                 foreign_mu_tag, foreign_mu_destroy,
+                 foreign_mu_call, foreign_mu_equalp);
 
         sx_register_type
                 (environment_type_identifier,
@@ -163,6 +189,32 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
     return (sexpr)lx;
 }
 
+sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, sexpr *))
+{
+    static struct memory_pool pool
+            = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
+    struct foreign_lambda *lx = get_pool_mem (&pool);
+
+    lx->type = foreign_lambda_type_identifier;
+    lx->name = name;
+    lx->f    = f;
+
+    return (sexpr)lx;
+}
+
+sexpr lx_foreign_mu (sexpr name, sexpr (*f)(sexpr, sexpr *))
+{
+    static struct memory_pool pool
+            = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
+    struct foreign_lambda *lx = get_pool_mem (&pool);
+
+    lx->type = foreign_mu_type_identifier;
+    lx->name = name;
+    lx->f    = f;
+
+    return (sexpr)lx;
+}
+
 sexpr lx_lambda (sexpr expression, sexpr environment)
 {
     return make_lambda (lambda_type_identifier, expression, environment);
@@ -202,6 +254,35 @@ static sexpr lambda_equalp (sexpr a, sexpr b)
     return sx_false;
 }
 
+static sexpr foreign_lambda_serialise (sexpr lambda)
+{
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+
+    return lx->name;
+}
+
+static sexpr foreign_lambda_unserialise (sexpr lambda)
+{
+    return lx_foreign_lambda (lambda, (void *)0);
+}
+
+static void foreign_lambda_tag (sexpr lambda)
+{
+}
+
+static void foreign_lambda_destroy (sexpr lambda)
+{
+}
+
+static void foreign_lambda_call ( void )
+{
+}
+
+static sexpr foreign_lambda_equalp (sexpr a, sexpr b)
+{
+    return sx_false;
+}
+
 static sexpr mu_serialise (sexpr mu)
 {
     return lambda_serialise (mu);
@@ -225,6 +306,35 @@ static void mu_call ( void )
 }
 
 static sexpr mu_equalp (sexpr a, sexpr b)
+{
+    return sx_false;
+}
+
+static sexpr foreign_mu_serialise (sexpr lambda)
+{
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+
+    return lx->name;
+}
+
+static sexpr foreign_mu_unserialise (sexpr lambda)
+{
+    return lx_foreign_mu (lambda, (void *)0);
+}
+
+static void foreign_mu_tag (sexpr lambda)
+{
+}
+
+static void foreign_mu_destroy (sexpr lambda)
+{
+}
+
+static void foreign_mu_call ( void )
+{
+}
+
+static sexpr foreign_mu_equalp (sexpr a, sexpr b)
 {
     return sx_false;
 }
@@ -608,7 +718,22 @@ sexpr lx_apply (sexpr sx, sexpr args, sexpr *env)
     }
     else if (mup (sx))
     {
-        return sx;
+        struct lambda *p = (struct lambda *)sx;
+        sexpr s = lx_apply_lambda (p->arguments, p->code, *env, args);
+
+        return nexp (s) ? sx : s;
+    }
+    else if (flambdap (sx))
+    {
+        struct foreign_lambda *p = (struct foreign_lambda *)sx;
+
+        return p->f (args, env);
+    }
+    else if (fmup (sx))
+    {
+        struct foreign_lambda *p = (struct foreign_lambda *)sx;
+
+        return p->f (args, env);
     }
     else if (primitivep (sx))
     {
@@ -674,8 +799,8 @@ sexpr lx_eval (sexpr sx, sexpr *env)
         {
             sx = cons (lx_eval (sxcar, env), sxcdr);
         }
-        else if (lambdap (sxcar) || mup (sxcar) || primitivep (sxcar) ||
-                 promisep (sxcar))
+        else if (lambdap (sxcar)  || mup (sxcar)      || primitivep (sxcar) ||
+                 promisep (sxcar) || flambdap (sxcar) || fmup (sxcar))
         {
             r = lx_apply (sxcar, sxcdr, env);
 
