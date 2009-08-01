@@ -800,7 +800,7 @@ sexpr lx_eval (sexpr sx, sexpr *env)
             sx = cons (lx_eval (sxcar, env), sxcdr);
         }
         else if (lambdap (sxcar)  || mup (sxcar)      || primitivep (sxcar) ||
-                 promisep (sxcar) || flambdap (sxcar) || fmup (sxcar))
+                 promisep (sxcar))
         {
             r = lx_apply (sxcar, sxcdr, env);
 
@@ -810,6 +810,10 @@ sexpr lx_eval (sexpr sx, sexpr *env)
             }
 
             sx = r;
+        }
+        else if (flambdap (sxcar) || fmup (sxcar))
+        {
+            return lx_apply (sxcar, sxcdr, env);
         }
         else if (consp (sxcar))
         {
