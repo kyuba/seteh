@@ -913,3 +913,29 @@ sexpr lx_environment_bind (sexpr env, sexpr key, sexpr value)
 
     return lx_make_environment (r);
 }
+
+sexpr lx_environment_join (sexpr a, sexpr b)
+{
+    sexpr r = sx_end_of_list;
+
+    if (environmentp (a) && environmentp (b))
+    {
+        struct environment *ta = (struct environment *)a;
+        struct environment *tb = (struct environment *)b;
+        sexpr c = tb->environment;
+
+        while (consp (c))
+        {
+            sexpr d  = car (c);
+            sexpr da = car (d);
+            ta = (struct environment *)lx_environment_unbind ((sexpr)ta, da);
+            ta = (struct environment *)lx_environment_bind ((sexpr)ta, da, cdr (d));
+            c = cdr (c);
+        }
+
+        return (sexpr)ta;
+    }
+
+    return lx_make_environment (r);
+}
+
