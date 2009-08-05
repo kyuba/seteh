@@ -939,3 +939,15 @@ sexpr lx_environment_join (sexpr a, sexpr b)
     return lx_make_environment (r);
 }
 
+sexpr lx_environment_alist (sexpr env)
+{
+    if (environmentp (env))
+    {
+        struct environment *tenv = (struct environment *)env;
+
+        return tenv->environment;
+    }
+
+    return sx_end_of_list;
+}
+
