@@ -991,6 +991,8 @@ sexpr lx_make_environment (sexpr env)
     rv->type        = environment_type_identifier;
     rv->environment = env;
 
+    tree_add_node_value (&environment_tree, (int_pointer)env, (void *)rv);
+
     return (sexpr)rv;
 }
 
