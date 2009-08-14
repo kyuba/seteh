@@ -29,6 +29,16 @@
 #include <seteh/lambda.h>
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
+#include <curie/tree.h>
+#include <curie/gc.h>
+#include <curie/string.h>
+
+static struct tree lambda_tree         = TREE_INITIALISER;
+static struct tree mu_tree             = TREE_INITIALISER;
+static struct tree foreign_lambda_tree = TREE_INITIALISER;
+static struct tree foreign_mu_tree     = TREE_INITIALISER;
+static struct tree environment_tree    = TREE_INITIALISER;
+static struct tree promise_tree        = TREE_INITIALISER;
 
 static char initialised = 0;
 
@@ -125,6 +135,13 @@ void initialise_seteh ( void )
     }
 }
 
+static void sx_map_call (struct tree_node *node, void *u)
+{
+    sexpr sx = (sexpr)node_get_value(node);
+
+    gc_call (sx);
+}
+
 static sexpr lx_code (sexpr *environment, sexpr args, sexpr code)
 {
     sexpr n = args, t, e;
@@ -150,13 +167,9 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct lambda));
-    struct lambda *lx = get_pool_mem (&pool);
-    sexpr arguments, code, t, environment;
-
-    if (lx == (struct lambda *)0)
-    {
-        return sx_nonexistent;
-    }
+    struct lambda *lx;
+    sexpr arguments, code, t, environment, na, nc, ne, u;
+    struct tree_node *n;
 
     t = car (args);
     if (nexp (env))
@@ -179,12 +192,36 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
     arguments = car (args);
     code      = cdr (args);
 
+    na = arguments;
+    nc = lx_code (&environment, arguments, code);
+    ne = environment;
+
+    u = cons (ne, cons (na, nc));
+
+    if ((n = tree_get_node (((type == lambda_type_identifier) ? &lambda_tree
+                                                              : &mu_tree),
+                            (int_pointer)u)))
+    {
+        return (sexpr)node_get_value (n);
+    }
+
+    lx = get_pool_mem (&pool);
+
+    if (lx == (struct lambda *)0)
+    {
+        return sx_nonexistent;
+    }
+
     lx->type      = type;
     lx->arguments = 0;
 
-    lx->arguments = arguments;
-    lx->code = lx_code (&environment, arguments, code);
-    lx->environment = environment;
+    lx->arguments   = na;
+    lx->code        = nc;
+    lx->environment = ne;
+
+    tree_add_node_value
+            (((type == lambda_type_identifier) ? &lambda_tree : &mu_tree),
+             (int_pointer)u, (void *)lx);
 
     return (sexpr)lx;
 }
@@ -193,11 +230,23 @@ sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, sexpr *))
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
-    struct foreign_lambda *lx = get_pool_mem (&pool);
+    struct foreign_lambda *lx;
+    unsigned long len;
+    int_32 hash = str_hash (sx_symbol (name), &len);
+    struct tree_node *n;
+
+    if ((n = tree_get_node (&foreign_lambda_tree, (int_pointer)hash)))
+    {
+        return (sexpr)node_get_value (n);
+    }
+
+    lx = get_pool_mem (&pool);
 
     lx->type = foreign_lambda_type_identifier;
     lx->name = name;
     lx->f    = f;
+
+    tree_add_node_value (&foreign_lambda_tree, (int_pointer)hash, (void *)lx);
 
     return (sexpr)lx;
 }
@@ -206,11 +255,23 @@ sexpr lx_foreign_mu (sexpr name, sexpr (*f)(sexpr, sexpr *))
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
-    struct foreign_lambda *lx = get_pool_mem (&pool);
+    struct foreign_lambda *lx;
+    unsigned long len;
+    int_32 hash = str_hash (sx_symbol (name), &len);
+    struct tree_node *n;
+
+    if ((n = tree_get_node (&foreign_mu_tree, (int_pointer)hash)))
+    {
+        return (sexpr)node_get_value (n);
+    }
+
+    lx = get_pool_mem (&pool);
 
     lx->type = foreign_mu_type_identifier;
     lx->name = name;
     lx->f    = f;
+
+    tree_add_node_value (&foreign_mu_tree, (int_pointer)hash, (void *)lx);
 
     return (sexpr)lx;
 }
@@ -239,14 +300,25 @@ static sexpr lambda_unserialise (sexpr lambda)
 
 static void lambda_tag (sexpr lambda)
 {
+    struct lambda *sx = (struct lambda *)lambda;
+
+    gc_tag (sx->arguments);
+    gc_tag (sx->code);
+    gc_tag (sx->environment);
 }
 
 static void lambda_destroy (sexpr lambda)
 {
+    sexpr t = lambda_serialise (lambda);
+
+    free_pool_mem ((void *)lambda);
+
+    tree_remove_node(&lambda_tree, (int_pointer)t);
 }
 
 static void lambda_call ( void )
 {
+    tree_map (&lambda_tree, sx_map_call, (void *)0);
 }
 
 static sexpr lambda_equalp (sexpr a, sexpr b)
@@ -268,14 +340,24 @@ static sexpr foreign_lambda_unserialise (sexpr lambda)
 
 static void foreign_lambda_tag (sexpr lambda)
 {
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+
+    gc_tag (lx->name);
 }
 
 static void foreign_lambda_destroy (sexpr lambda)
 {
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+    sexpr t = lx->name;
+
+    free_pool_mem ((void *)lambda);
+
+    tree_remove_node(&foreign_lambda_tree, (int_pointer)t);
 }
 
 static void foreign_lambda_call ( void )
 {
+    tree_map (&foreign_lambda_tree, sx_map_call, (void *)0);
 }
 
 static sexpr foreign_lambda_equalp (sexpr a, sexpr b)
@@ -295,14 +377,25 @@ static sexpr mu_unserialise (sexpr mu)
 
 static void mu_tag (sexpr mu)
 {
+    struct lambda *sx = (struct lambda *)mu;
+
+    gc_tag (sx->arguments);
+    gc_tag (sx->code);
+    gc_tag (sx->environment);
 }
 
 static void mu_destroy (sexpr mu)
 {
+    sexpr t = lambda_serialise (mu);
+
+    free_pool_mem ((void *)mu);
+
+    tree_remove_node(&mu_tree, (int_pointer)t);
 }
 
 static void mu_call ( void )
 {
+    tree_map (&mu_tree, sx_map_call, (void *)0);
 }
 
 static sexpr mu_equalp (sexpr a, sexpr b)
@@ -324,14 +417,24 @@ static sexpr foreign_mu_unserialise (sexpr lambda)
 
 static void foreign_mu_tag (sexpr lambda)
 {
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+
+    gc_tag (lx->name);
 }
 
 static void foreign_mu_destroy (sexpr lambda)
 {
+    struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
+    sexpr t = lx->name;
+
+    free_pool_mem ((void *)lambda);
+
+    tree_remove_node(&foreign_mu_tree, (int_pointer)t);
 }
 
 static void foreign_mu_call ( void )
 {
+    tree_map (&foreign_mu_tree, sx_map_call, (void *)0);
 }
 
 static sexpr foreign_mu_equalp (sexpr a, sexpr b)
@@ -353,14 +456,24 @@ static sexpr environment_unserialise (sexpr env)
 
 static void environment_tag (sexpr env)
 {
+    struct environment *t = (struct environment *)env;
+
+    gc_tag (t->environment);
 }
 
 static void environment_destroy (sexpr env)
 {
+    struct environment *t = (struct environment *)env;
+    sexpr tn = t->environment;
+
+    free_pool_mem ((void *)env);
+
+    tree_remove_node(&environment_tree, (int_pointer)tn);
 }
 
 static void environment_call ( void )
 {
+    tree_map (&environment_tree, sx_map_call, (void *)0);
 }
 
 static sexpr environment_equalp (sexpr a, sexpr b)
@@ -475,7 +588,16 @@ sexpr lx_make_promise (sexpr code, sexpr environment)
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct promise));
-    struct promise *p = get_pool_mem (&pool);
+    struct promise *p;
+    struct tree_node *n;
+    sexpr pt = cons (environment, code);
+
+    if ((n = tree_get_node (&promise_tree, (int_pointer)pt)))
+    {
+        return (sexpr)node_get_value (n);
+    }
+
+    p = get_pool_mem (&pool);
 
     if (p == (struct promise *)0)
     {
@@ -486,6 +608,8 @@ sexpr lx_make_promise (sexpr code, sexpr environment)
     p->ptype       = pt_manual;
     p->environment = environment;
     p->code        = code;
+
+    tree_add_node_value (&promise_tree, (int_pointer)pt, (void *)p);
 
     return (sexpr)p;
 }
@@ -518,14 +642,24 @@ static sexpr promise_unserialise (sexpr promise)
 
 static void promise_tag (sexpr promise)
 {
+    struct promise *p = (struct promise *)promise;
+
+    gc_tag (p->environment);
+    gc_tag (p->code);
 }
 
 static void promise_destroy (sexpr promise)
 {
+    sexpr pt = promise_serialise (promise);
+
+    free_pool_mem ((void *)promise);
+
+    tree_remove_node(&promise_tree, (int_pointer)pt);
 }
 
 static void promise_call ( void )
 {
+    tree_map (&promise_tree, sx_map_call, (void *)0);
 }
 
 static sexpr promise_equalp (sexpr a, sexpr b)
@@ -839,7 +973,15 @@ sexpr lx_make_environment (sexpr env)
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct environment));
-    struct environment *rv = get_pool_mem (&pool);
+    struct environment *rv;
+    struct tree_node *n;
+
+    if ((n = tree_get_node (&environment_tree, (int_pointer)env)))
+    {
+        return (sexpr)node_get_value (n);
+    }
+
+    rv = get_pool_mem (&pool);
 
     if (rv == (struct environment *)0)
     {
