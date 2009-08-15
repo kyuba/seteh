@@ -237,7 +237,14 @@ sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, sexpr *))
 
     if ((n = tree_get_node (&foreign_lambda_tree, (int_pointer)hash)))
     {
-        return (sexpr)node_get_value (n);
+        lx = (struct foreign_lambda *)node_get_value (n);
+
+        if (f != (void *)0)
+        {
+            lx->f = f;
+        }
+
+        return (sexpr)lx;
     }
 
     lx = get_pool_mem (&pool);
@@ -262,7 +269,14 @@ sexpr lx_foreign_mu (sexpr name, sexpr (*f)(sexpr, sexpr *))
 
     if ((n = tree_get_node (&foreign_mu_tree, (int_pointer)hash)))
     {
-        return (sexpr)node_get_value (n);
+        lx = (struct foreign_lambda *)node_get_value (n);
+
+        if (f != (void *)0)
+        {
+            lx->f = f;
+        }
+
+        return (sexpr)lx;
     }
 
     lx = get_pool_mem (&pool);
