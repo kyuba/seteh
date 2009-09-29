@@ -42,6 +42,7 @@ void initialise_seteh ( void )
         initialise_seteh_lambda ();
         initialise_seteh_promise ();
         initialise_seteh_eval ();
+        initialise_seteh_state ();
     }
 }
 

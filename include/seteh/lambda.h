@@ -68,6 +68,7 @@ sexpr lx_environment_bind   (sexpr env, sexpr key, sexpr value);
 sexpr lx_environment_join   (sexpr a, sexpr b);
 sexpr lx_environment_alist  (sexpr env);
 sexpr lx_make_promise       (sexpr code, sexpr environment);
+sexpr lx_make_state         (sexpr s, sexpr e, sexpr c, sexpr d);
 
 #ifdef __cplusplus
 }

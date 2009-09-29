@@ -181,6 +181,8 @@ static sexpr primitive_equalp (sexpr a, sexpr b)
     return (pa->op == pb->op) ? sx_true : sx_false;
 }
 
+#if 1
+
 static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 {
     switch (op)
@@ -482,3 +484,19 @@ sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
 
     return sx;
 }
+
+#else
+
+sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
+{
+    struct machine_state st =
+        { machine_state_type_identifier,
+          sx_end_of_list,
+          *env,
+          sx,
+          cont };
+
+    return sx_nonexistent;
+}
+
+#endif

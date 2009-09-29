@@ -115,7 +115,8 @@ void lx_sx_map_call (struct tree_node *node, void *u);
 void initialise_seteh_environment ( void );
 void initialise_seteh_lambda      ( void );
 void initialise_seteh_promise     ( void );
-void initialise_seteh_eval     ( void );
+void initialise_seteh_eval        ( void );
+void initialise_seteh_state       ( void );
 
 sexpr lx_make_automatic_promise (sexpr code, sexpr environment);
 
