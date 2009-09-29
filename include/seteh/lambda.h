@@ -35,13 +35,14 @@
 extern "C" {
 #endif
 
-#define lambda_type_identifier         0x03bb
-#define mu_type_identifier             0x03bc
-#define foreign_lambda_type_identifier 0x03be
-#define foreign_mu_type_identifier     0x03bf
-#define environment_type_identifier    0x03b5
-#define primitive_type_identifier      0x03c6
-#define promise_type_identifier        0x03c7
+#define lambda_type_identifier         0x03bb /* λ */
+#define mu_type_identifier             0x03bc /* μ */
+#define foreign_lambda_type_identifier 0x03be /* ξ */
+#define foreign_mu_type_identifier     0x03bf /* ο */
+#define environment_type_identifier    0x03b5 /* ε */
+#define primitive_type_identifier      0x03c6 /* φ */
+#define promise_type_identifier        0x03c7 /* χ */
+#define machine_state_type_identifier  0x03ce /* ώ */
 
 #define lambdap(sx)      sx_customp(sx,lambda_type_identifier)
 #define mup(sx)          sx_customp(sx,mu_type_identifier)
@@ -50,6 +51,7 @@ extern "C" {
 #define environmentp(sx) sx_customp(sx,environment_type_identifier)
 #define primitivep(sx)   sx_customp(sx,primitive_type_identifier)
 #define promisep(sx)     sx_customp(sx,promise_type_identifier)
+#define mstatep(sx)      sx_customp(sx,machine_state_type_identifier)
 
 void initialise_seteh ( void );
 
@@ -58,7 +60,7 @@ sexpr lx_mu                 (sexpr sx, sexpr env);
 sexpr lx_foreign_lambda     (sexpr name, sexpr (*f)(sexpr, sexpr *));
 sexpr lx_foreign_mu         (sexpr name, sexpr (*f)(sexpr, sexpr *));
 sexpr lx_apply              (sexpr sx, sexpr args, sexpr *env);
-sexpr lx_eval               (sexpr sx, sexpr *env);
+sexpr lx_eval               (sexpr sx, sexpr *env, sexpr cont);
 sexpr lx_make_environment   (sexpr env);
 sexpr lx_environment_lookup (sexpr env, sexpr key);
 sexpr lx_environment_unbind (sexpr env, sexpr key);

@@ -56,7 +56,7 @@ int cmain ()
     {
         if (!nexp (sx))
         {
-            sexpr eval = lx_eval (sx, &env);
+            sexpr eval = lx_eval (sx, &env, sx_end_of_list);
 
             if (truep(equalp (eval, make_integer (42))))
             {

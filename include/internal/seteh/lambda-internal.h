@@ -30,6 +30,7 @@
 #define LIBSETEH_LAMBDA_INTERNAL_H
 
 #include <curie/sexpr.h>
+#include <curie/tree.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -99,36 +100,24 @@ struct promise
     sexpr code;
 };
 
-#define define_primitive(o,s,v) \
-    static const struct primitive sexpr_payload_sx_p_ ## o\
-       = { primitive_type_identifier, o };\
-    static const sexpr sx_p_ ## o = ((const sexpr)&(sexpr_payload_sx_p_ ## o));\
-    define_symbol(s,v)
-
-define_symbol (sym_bad_primitive,        "bad-primitive");
-define_symbol (sym_if_alt,               "if");
-
-define_primitive (op_lambda,         sym_lambda,      "lambda");
-define_primitive (op_mu,             sym_mu,          "mu");
-define_primitive (op_addition,       sym_plus,        "+");
-define_primitive (op_subtraction,    sym_minus,       "-");
-define_primitive (op_multiplication, sym_multiply,    "*");
-define_primitive (op_division,       sym_divide,      "/");
-define_primitive (op_modulo,         sym_modulo,      "%");
-define_primitive (op_dereference,    sym_dereference, "dereference");
-define_primitive (op_unbound,        sym_unbound,     "unbound");
-define_primitive (op_equalp,         sym_equalp,      "equal?");
-define_primitive (op_if,             sym_if,          "?");
-define_primitive (op_gt,             sym_gt,          ">?");
-define_primitive (op_gte,            sym_gte,         ">=?");
-define_primitive (op_lt,             sym_lt,          "<?");
-define_primitive (op_lte,            sym_lte,         "<=?");
-define_primitive (op_equals,         sym_equals,      "=?");
-define_primitive (op_delay,          sym_delay,       "delay");
-define_primitive (op_force,          sym_force,       "force");
-define_primitive (op_eval,           sym_eval,        "eval");
+struct machine_state
+{
+    unsigned int type;
+    sexpr stack;
+    sexpr environment;
+    sexpr code;
+    sexpr dump;
+};
 
 /* struct sexpr_io *stdio;*/
+
+void lx_sx_map_call (struct tree_node *node, void *u);
+void initialise_seteh_environment ( void );
+void initialise_seteh_lambda      ( void );
+void initialise_seteh_promise     ( void );
+void initialise_seteh_eval     ( void );
+
+sexpr lx_make_automatic_promise (sexpr code, sexpr environment);
 
 #ifdef __cplusplus
 }
