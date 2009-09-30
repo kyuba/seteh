@@ -251,22 +251,37 @@ static sexpr lx_apply_primitive
                             car (cdr (cdr (args)));
         }
         case op_equalp:
-            return equalp (lx_eval (car (args), &(s->environment), sx_end_of_list),
-                           lx_eval (car (cdr (args)), &(s->environment), sx_end_of_list));
+            if (eolp (s->stack))
+            {
+                s->stack = cons (make_primitive(op_equalp), s->stack);
+                return sx_nonexistent;
+            }
+            else
+            {
+//                sx_write (stdio, s);
+//                sx_write (stdio, args);
+                return equalp (car (args), car (cdr (args)));
+            }
         case op_gt:
         case op_gte:
         case op_lt:
         case op_lte:
         case op_equals:
         {
-            sexpr a = lx_eval (car (args), &(s->environment), sx_end_of_list),
-                  b = lx_eval (car (cdr (args)), &(s->environment), sx_end_of_list);
+            sexpr a = car (args), b = car (cdr (args));
 
             if (!integerp(a) || !integerp(b))
             {
-                return cons (make_primitive (op),
-                             cons (a,
-                                   cons (b, sx_end_of_list)));
+                if (eolp (s->stack))
+                {
+                    s->stack = cons (make_primitive(op_equalp), s->stack);
+                    return sx_nonexistent;
+                }
+                else
+                {
+                    return cons (make_primitive (op),
+                                 cons (a, cons (b, sx_end_of_list)));
+                }
             }
 
             switch (op)
@@ -292,11 +307,19 @@ static sexpr lx_apply_primitive
             {
                 struct promise *p = (struct promise *)args;
 
-                sexpr e = p->environment;
-                return lx_eval (p->code, &e, sx_end_of_list);
+                s->dump = lx_make_state (s->stack, s->environment, s->code,
+                                         s->dump);
+
+                s->code = p->code;
+                s->environment = p->environment;
+                s->stack = sx_end_of_list;
+
+                return sx_nonexistent;
             }
         case op_eval:
-            return lx_eval (args, &(s->environment), sx_end_of_list);
+            s->code = args;
+            s->stack = sx_end_of_list;
+            return sx_nonexistent;
     }
 
     return args;
@@ -436,6 +459,8 @@ sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
             {
                 struct lambda *l = (struct lambda *)b;
                 sexpr t, tb = cdr (a), n = l->arguments;
+
+//                sx_write (stdio, b);
 
                 st.environment =
                         lx_environment_join (st.environment, l->environment);
