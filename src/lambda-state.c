@@ -58,7 +58,10 @@ void initialise_seteh_state ( void )
 static sexpr state_serialise (sexpr secd)
 {
     struct machine_state *t = (struct machine_state *)secd;
-    return cons (t->stack, cons (t->environment, cons (t->code, t->dump)));
+    return cons (t->stack,
+                 cons (t->environment,
+                       cons(t->code,
+                            cons(t->dump, sx_end_of_list))));
 }
 
 static sexpr state_unserialise (sexpr secd)
@@ -68,23 +71,19 @@ static sexpr state_unserialise (sexpr secd)
     sexpr e   = car (sd);
     sexpr sdd = cdr (sd);
     sexpr c   = car (sdd);
-    sexpr d   = cdr (sdd);
+    sexpr d   = car (cdr (sdd));
 
     return lx_make_state (s, e, c, d);
 }
 
 static void state_tag (sexpr secd)
 {
-    struct machine_state *t = (struct machine_state *)secd;
-    sexpr tn = cons (t->stack, cons (t->environment, cons (t->code, t->dump)));
-
-    gc_tag (tn);
+    gc_tag (state_serialise (secd));
 }
 
 static void state_destroy (sexpr secd)
 {
-    struct machine_state *t = (struct machine_state *)secd;
-    sexpr tn = cons (t->stack, cons (t->environment, cons (t->code, t->dump)));
+    sexpr tn = state_serialise (secd);
 
     free_pool_mem ((void *)secd);
 
@@ -108,7 +107,7 @@ sexpr lx_make_state (sexpr s, sexpr e, sexpr c, sexpr d)
     struct machine_state *rv;
     struct tree_node *n;
 
-    sexpr t = cons (s, cons (e, cons (c, d)));
+    sexpr t = cons (s, cons (e, cons (c, cons (d, sx_end_of_list))));
 
     if ((n = tree_get_node (&state_tree, (int_pointer)t)))
     {
@@ -122,6 +121,7 @@ sexpr lx_make_state (sexpr s, sexpr e, sexpr c, sexpr d)
         return sx_nonexistent;
     }
 
+    rv->type        = machine_state_type_identifier;
     rv->stack       = s;
     rv->environment = e;
     rv->code        = c;

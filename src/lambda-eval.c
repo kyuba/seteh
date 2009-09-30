@@ -48,8 +48,6 @@ define_primitive (op_subtraction,    sym_minus,       "-");
 define_primitive (op_multiplication, sym_multiply,    "*");
 define_primitive (op_division,       sym_divide,      "/");
 define_primitive (op_modulo,         sym_modulo,      "%");
-define_primitive (op_dereference,    sym_dereference, "dereference");
-define_primitive (op_unbound,        sym_unbound,     "unbound");
 define_primitive (op_equalp,         sym_equalp,      "equal?");
 define_primitive (op_if,             sym_if,          "?");
 define_primitive (op_gt,             sym_gt,          ">?");
@@ -93,8 +91,6 @@ static sexpr primitive_serialise (sexpr op)
         primitive_serialise_case (op_multiplication, sym_multiply);
         primitive_serialise_case (op_division,       sym_divide);
         primitive_serialise_case (op_modulo,         sym_modulo);
-        primitive_serialise_case (op_dereference,    sym_dereference);
-        primitive_serialise_case (op_unbound,        sym_unbound);
         primitive_serialise_case (op_equalp,         sym_equalp);
         primitive_serialise_case (op_if,             sym_if);
         primitive_serialise_case (op_gt,             sym_gt);
@@ -123,8 +119,6 @@ static sexpr make_primitive (enum primitive_ops rop)
         make_primitive_case (op_multiplication);
         make_primitive_case (op_division);
         make_primitive_case (op_modulo);
-        make_primitive_case (op_dereference);
-        make_primitive_case (op_unbound);
         make_primitive_case (op_equalp);
         make_primitive_case (op_if);
         make_primitive_case (op_gt);
@@ -155,8 +149,6 @@ static sexpr primitive_unserialise (sexpr op)
     primitive_unserialise_map (sym_multiply,    op, op_multiplication);
     primitive_unserialise_map (sym_divide,      op, op_division);
     primitive_unserialise_map (sym_modulo,      op, op_modulo);
-    primitive_unserialise_map (sym_dereference, op, op_dereference);
-    primitive_unserialise_map (sym_unbound,     op, op_unbound);
     primitive_unserialise_map (sym_equalp,      op, op_equalp);
     primitive_unserialise_map (sym_if,          op, op_if);
     primitive_unserialise_map (sym_gt,          op, op_gt);
@@ -181,16 +173,15 @@ static sexpr primitive_equalp (sexpr a, sexpr b)
     return (pa->op == pb->op) ? sx_true : sx_false;
 }
 
-#if 1
-
-static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
+static sexpr lx_apply_primitive
+        (enum primitive_ops op, sexpr args, struct machine_state *s)
 {
     switch (op)
     {
         case op_lambda:
-            return lx_lambda (args, *env);
+            return lx_lambda (args, s->environment);
         case op_mu:
-            return lx_mu (args, *env);
+            return lx_mu (args, s->environment);
         case op_addition:
         case op_subtraction:
         case op_multiplication:
@@ -198,11 +189,12 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
         case op_modulo:
         {
             int_pointer_s i = 0;
-            sexpr ta = args, ti = lx_eval (car (ta), env, sx_end_of_list);
+            sexpr ta = args, ti = car (ta);
 
             if (!integerp (ti))
             {
-                return cons (make_primitive (op), args);
+                s->stack = cons (make_primitive (op), s->stack);
+                return sx_nonexistent;
             }
 
             i = sx_integer(ti);
@@ -210,11 +202,12 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 
             while (consp (ta))
             {
-                ti = lx_eval (car (ta), env, sx_end_of_list);
+                ti = car (ta);
 
                 if (!integerp (ti))
                 {
-                    return cons (make_primitive (op), args);
+                    s->stack = cons (make_primitive (op), s->stack);
+                    return sx_nonexistent;
                 }
 
                 switch (op)
@@ -243,19 +236,9 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
 
             return make_integer(i);
         }
-        case op_dereference:
-        {
-            sexpr r = lx_environment_lookup (*env, args);
-
-            return nexp (r) ? cons (make_primitive (op_dereference), args) : r;
-        }
-        case op_unbound:
-        {
-            return make_primitive (op_unbound);
-        }
         case op_if:
         {
-            sexpr cond = lx_eval (car (args), env, sx_end_of_list);
+            sexpr cond = lx_eval (car(args), &(s->environment), sx_end_of_list);
 
             if (!truep (cond) && !falsep (cond))
             {
@@ -268,16 +251,16 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
                             car (cdr (cdr (args)));
         }
         case op_equalp:
-            return equalp (lx_eval (car (args), env, sx_end_of_list),
-                           lx_eval (car (cdr (args)), env, sx_end_of_list));
+            return equalp (lx_eval (car (args), &(s->environment), sx_end_of_list),
+                           lx_eval (car (cdr (args)), &(s->environment), sx_end_of_list));
         case op_gt:
         case op_gte:
         case op_lt:
         case op_lte:
         case op_equals:
         {
-            sexpr a = lx_eval (car (args), env, sx_end_of_list),
-                  b = lx_eval (car (cdr (args)), env, sx_end_of_list);
+            sexpr a = lx_eval (car (args), &(s->environment), sx_end_of_list),
+                  b = lx_eval (car (cdr (args)), &(s->environment), sx_end_of_list);
 
             if (!integerp(a) || !integerp(b))
             {
@@ -299,11 +282,11 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
                 case op_equals:
                     return (sx_integer(a) == sx_integer(b))? sx_true : sx_false;
                 default:
-                    return sx_nonexistent;
+                    return sx_nil;
             }
         }
         case op_delay:
-            return lx_make_promise (args, *env);
+            return lx_make_promise (args, s->environment);
         case op_force:
             if (promisep(args))
             {
@@ -313,190 +296,219 @@ static sexpr lx_apply_primitive (enum primitive_ops op, sexpr args, sexpr *env)
                 return lx_eval (p->code, &e, sx_end_of_list);
             }
         case op_eval:
-            return lx_eval (args, env, sx_end_of_list);
+            return lx_eval (args, &(s->environment), sx_end_of_list);
     }
 
     return args;
 }
 
-static sexpr lx_apply_lambda (sexpr argspec, sexpr code, sexpr env, sexpr args)
+static sexpr eval_atom (sexpr sx, sexpr environment)
 {
-    sexpr t, e, tb = args, rv = sx_nonexistent, n = argspec;
+    sexpr b;
 
-    while (consp (tb))
+    if (symbolp (sx))
     {
-        t   = car (n);
-        e   = lx_eval (car (tb), &env, sx_end_of_list);
-
-        env = lx_environment_unbind (env, t);
-        env = lx_environment_bind   (env, t, e);
-
-        tb  = cdr (tb);
-        n   = cdr (n);
-    }
-
-/*    sx_write (stdio, env);*/
-
-    t = code;
-
-    while (e = cdr (t), consp (e))
-    {
-        t = e;
-    }
-
-    if (consp (n))
-    {
-        return lx_lambda (cons (n, cons (rv, sx_end_of_list)), env);
-    }
-    else
-    {
-/*        rv = lx_eval (car (t), &env, sx_end_of_list);*/
-        rv = lx_make_automatic_promise (car (t), env);
-    }
-
-    return rv;
-}
-
-sexpr lx_apply (sexpr sx, sexpr args, sexpr *env)
-{
-    if (lambdap (sx))
-    {
-        struct lambda *p = (struct lambda *)sx;
-        sexpr s = lx_apply_lambda (p->arguments, p->code, *env, args);
-
-        return nexp (s) ? sx : s;
-    }
-    else if (mup (sx))
-    {
-        struct lambda *p = (struct lambda *)sx;
-        sexpr s = lx_apply_lambda (p->arguments, p->code, *env, args);
-
-        return nexp (s) ? sx : s;
-    }
-    else if (flambdap (sx))
-    {
-        struct foreign_lambda *p = (struct foreign_lambda *)sx;
-
-        return p->f (args, env);
-    }
-    else if (fmup (sx))
-    {
-        struct foreign_lambda *p = (struct foreign_lambda *)sx;
-
-        return p->f (args, env);
-    }
-    else if (primitivep (sx))
-    {
-        struct primitive *p = (struct primitive *)sx;
-
-/*        sx_write (stdio, cons (*env, cons (sx, args)));*/
-
-        sx = lx_apply_primitive (p->op, args, env);
-
-/*        sx_write (stdio, sx);*/
-
-        return sx;
-    }
-    else if (promisep (sx))
-    {
-        struct promise *p = (struct promise *)sx;
-
-        if (p->ptype == pt_automatic)
+        b = lx_environment_lookup (environment, sx);
+        if (nexp (b))
         {
-            sexpr e = p->environment;
-            return lx_eval (p->code, &e, sx_end_of_list);
-        }
+            b = primitive_unserialise (sx);
 
-        return sx;
-    }
-
-    return sx_nonexistent;
-}
-
-sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
-{
-    sexpr sxcar, sxcdr, r, e;
-
-    while (consp (sx) || promisep (sx) || symbolp (sx))
-    {
-        if (symbolp (sx))
-        {
-            sexpr sxt = primitive_unserialise (sx);
-
-            sx = nexp (sxt) ? cons (make_primitive (op_dereference), sx) : sxt;
-
-            continue;
-        }
-        else if (promisep (sx))
-        {
-            struct promise *p = (struct promise *)sx;
-
-            if (p->ptype == pt_automatic)
+            if (!nexp (b))
             {
-                e = p->environment;
-                env = &e;
-                sx = p->code;
-                continue;
+                return b;
             }
-
-            return sx;
-        }
-
-        sxcar = car (sx);
-        sxcdr = cdr (sx);
-
-        if (symbolp (sxcar))
-        {
-            sx = cons (lx_eval (sxcar, env, cont), sxcdr);
-        }
-        else if (lambdap (sxcar)  || mup (sxcar)      || primitivep (sxcar) ||
-                 promisep (sxcar))
-        {
-            r = lx_apply (sxcar, sxcdr, env);
-
-            if (truep (equalp (r, sx)))
-            {
-                return sx;
-            }
-
-            sx = r;
-        }
-        else if (flambdap (sxcar) || fmup (sxcar))
-        {
-            return lx_apply (sxcar, sxcdr, env);
-        }
-        else if (consp (sxcar))
-        {
-            r = cons (lx_eval (sxcar, env, cont), sxcdr);
-
-            if (truep (equalp (r, sx)))
-            {
-                return sx;
-            }
-
-            sx = r;
         }
         else
         {
-            return sx;
+            return b;
         }
     }
 
     return sx;
 }
 
-#else
-
 sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
 {
     struct machine_state st =
-        { machine_state_type_identifier,
-          sx_end_of_list,
-          *env,
-          sx,
-          cont };
+        { machine_state_type_identifier, sx_end_of_list, *env, sx, cont };
+    sexpr a, b;
+    char reset;
 
-    return sx_nonexistent;
+//    sx_write (stdio, &st);
+
+    do
+    {
+        reset = 0;
+//        sx_write (stdio, &st);
+
+        if (consp (st.code))
+        {
+            if (eolp (st.stack))
+            {
+                a = eval_atom (car (st.code), st.environment);
+                if (primitivep (a))
+                {
+                    struct primitive *p = (struct primitive *)a;
+                    st.code = cdr (st.code);
+//                    sx_write (stdio, &st);
+                    b = lx_apply_primitive (p->op, st.code, &st);
+                  done_primitive_foreign:
+                    if (nexp (b))
+                    {
+//                        sx_write (stdio, &st);
+                        reset = 1;
+                        continue;
+                    }
+                    else
+                    {
+                        st.stack = cons (b, sx_end_of_list);
+                    }
+                    goto done;
+                }
+                else if (consp (a))
+                {
+                  sub_application:
+                    b = lx_make_state (st.stack, st.environment, cdr (st.code), st.dump);
+                    st.dump = cons (b, st.dump);
+                    st.stack = sx_end_of_list;
+                    st.code = a;
+                    reset = 1;
+                    continue;
+                }
+                else if (flambdap (a) || fmup (a))
+                {
+                    struct foreign_lambda *l = (struct foreign_lambda *)a;
+                    st.code = cdr (st.code);
+                    if (l->f)
+                    {
+                        b = l->f (st.code, &st);
+                        goto done_primitive_foreign;
+                    }
+                }
+                else
+                {
+                    st.stack = cons (a, st.stack);
+                    st.code = cdr (st.code);
+                }
+            }
+
+            while (consp (st.code))
+            {
+                a = car (st.code);
+                st.code = cdr (st.code);
+
+                if (symbolp (a))
+                {
+                    st.stack = cons (eval_atom (a, st.environment), st.stack);
+                }
+                else if (consp (a))
+                {
+                    goto sub_application;
+                }
+                else
+                {
+                    st.stack = cons (a, st.stack);
+                }
+            }
+        }
+        else if (!eolp (st.code))
+        {
+            st.stack = cons (eval_atom (st.code, st.environment), st.stack);
+        }
+
+        if (!eolp (st.stack))
+        {
+            a = sx_reverse (st.stack);
+            b = car (a);
+
+            if (primitivep (b))
+            {
+                struct primitive *p = (struct primitive *)b;
+                b = lx_apply_primitive (p->op, cdr (a), &st);
+                if (nexp (b))
+                {
+                    b = a; 
+                }
+
+                st.stack = cons (b, sx_end_of_list);
+            }
+            else if (lambdap (b) || mup (b))
+            {
+                struct lambda *l = (struct lambda *)b;
+                sexpr t, tb = cdr (a), n = l->arguments;
+
+                st.environment =
+                        lx_environment_join (st.environment, l->environment);
+
+//                sx_write (stdio, &st);
+
+                while (consp (tb))
+                {
+                    t  = car (n);
+
+                    st.environment =
+                            lx_environment_unbind (st.environment, t);
+                    st.environment =
+                            lx_environment_bind   (st.environment, t, car (tb));
+
+                    tb = cdr (tb);
+                    n  = cdr (n);
+                }
+
+//                sx_write (stdio, &st);
+
+                if (consp (n))
+                {
+                    st.stack =
+                            cons (lx_lambda (cons (n, l->code), st.environment),
+                                  sx_end_of_list);
+
+//                    sx_write (stdio, &st);
+                }
+                else
+                {
+                    st.code  = l->code;
+                    st.stack = sx_end_of_list;
+
+                    reset = 1;
+//                    sx_write (stdio, &st);
+                    continue;
+                }
+            }
+            else if (flambdap (b) || fmup (b))
+            {
+                struct foreign_lambda *l = (struct foreign_lambda *)b;
+                if (l->f)
+                {
+                    b = l->f (cdr (a), &st);
+                    if (!nexp (b))
+                    {
+                        st.stack = cons (b, sx_end_of_list);
+                    }
+                }
+            }
+        }
+
+      done:
+
+        if (consp (st.dump))
+        {
+            sexpr new_state = car (st.dump);
+            if (mstatep (new_state))
+            {
+                struct machine_state *m = (struct machine_state *)new_state;
+                st.stack = cons (car (st.stack), m->stack);
+                st.environment = m->environment;
+                st.code = m->code;
+                st.dump = m->dump;
+
+                reset = 1;
+            }
+        }
+    }
+    while (reset == (char)1);
+
+//    sx_write (stdio, &st);
+
+    return car (st.stack);
 }
-
-#endif

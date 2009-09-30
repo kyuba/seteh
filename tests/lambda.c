@@ -32,7 +32,7 @@ struct sexpr_io *stdio;
 
 define_symbol (sym_f, "f");
 
-sexpr f (sexpr args, sexpr *environment)
+sexpr f (sexpr args, struct machine_state *environment)
 {
     return cons (make_string ("wheeeeoooo"), args);
 }

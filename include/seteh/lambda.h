@@ -55,10 +55,19 @@ extern "C" {
 
 void initialise_seteh ( void );
 
+struct machine_state
+{
+    unsigned int type;
+    sexpr stack;
+    sexpr environment;
+    sexpr code;
+    sexpr dump;
+};
+
 sexpr lx_lambda             (sexpr sx, sexpr env);
 sexpr lx_mu                 (sexpr sx, sexpr env);
-sexpr lx_foreign_lambda     (sexpr name, sexpr (*f)(sexpr, sexpr *));
-sexpr lx_foreign_mu         (sexpr name, sexpr (*f)(sexpr, sexpr *));
+sexpr lx_foreign_lambda     (sexpr name,sexpr(*f)(sexpr,struct machine_state*));
+sexpr lx_foreign_mu         (sexpr name,sexpr(*f)(sexpr,struct machine_state*));
 sexpr lx_apply              (sexpr sx, sexpr args, sexpr *env);
 sexpr lx_eval               (sexpr sx, sexpr *env, sexpr cont);
 sexpr lx_make_environment   (sexpr env);

@@ -45,8 +45,6 @@ enum primitive_ops
     op_multiplication,
     op_division,
     op_modulo,
-    op_dereference,
-    op_unbound,
     op_equalp,
     op_if,
     op_gt,
@@ -77,7 +75,7 @@ struct foreign_lambda
 {
     unsigned int type;
     sexpr name;
-    sexpr (*f) (sexpr, sexpr *);
+    sexpr (*f) (sexpr, struct machine_state *);
 };
 
 struct environment
@@ -100,16 +98,7 @@ struct promise
     sexpr code;
 };
 
-struct machine_state
-{
-    unsigned int type;
-    sexpr stack;
-    sexpr environment;
-    sexpr code;
-    sexpr dump;
-};
-
-/* struct sexpr_io *stdio;*/
+struct sexpr_io *stdio;
 
 void lx_sx_map_call (struct tree_node *node, void *u);
 void initialise_seteh_environment ( void );

@@ -115,8 +115,9 @@ static sexpr lx_code (sexpr *environment, sexpr args, sexpr code)
         t = e;
     }
 
-//    return cons (lx_eval (car (t), environment, sx_end_of_list),sx_end_of_list);
-    return cons (car(t), sx_end_of_list);
+    return cons (lx_eval (car (t), environment, sx_end_of_list),sx_end_of_list);
+//    return cons (car(t), sx_end_of_list);
+//    return code;
 }
 
 static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
@@ -182,7 +183,7 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
     return (sexpr)lx;
 }
 
-sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, sexpr *))
+sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, struct machine_state *))
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
@@ -214,7 +215,7 @@ sexpr lx_foreign_lambda (sexpr name, sexpr (*f)(sexpr, sexpr *))
     return (sexpr)lx;
 }
 
-sexpr lx_foreign_mu (sexpr name, sexpr (*f)(sexpr, sexpr *))
+sexpr lx_foreign_mu (sexpr name, sexpr (*f)(sexpr, struct machine_state *))
 {
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct foreign_lambda));
