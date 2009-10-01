@@ -170,6 +170,31 @@ static sexpr primitive_equalp (sexpr a, sexpr b)
     return (pa->op == pb->op) ? sx_true : sx_false;
 }
 
+static sexpr eval_atom (sexpr sx, sexpr environment)
+{
+    sexpr b;
+
+    if (symbolp (sx))
+    {
+        b = lx_environment_lookup (environment, sx);
+        if (nexp (b))
+        {
+            b = primitive_unserialise (sx);
+
+            if (!nexp (b))
+            {
+                return b;
+            }
+        }
+        else
+        {
+            return b;
+        }
+    }
+
+    return sx;
+}
+
 static sexpr lx_apply_primitive
         (enum primitive_ops op, sexpr args, struct machine_state *s)
 {
@@ -185,50 +210,110 @@ static sexpr lx_apply_primitive
         case op_division:
         case op_modulo:
         {
-            int_pointer_s i = 0;
+            int_pointer_s i = 0, o = 0, n;
             sexpr ta = args, ti = car (ta);
 
-            if (!integerp (ti))
+            if (ninfp (ti) || pinfp (ti))
+            {
+                return ti;
+            }
+            else if (!integerp (ti))
             {
                 s->stack = cons (make_primitive (op), s->stack);
                 return sx_nonexistent;
             }
 
-            i = sx_integer(ti);
+            o = i = sx_integer(ti);
             ta = cdr (ta);
 
             while (consp (ta))
             {
                 ti = car (ta);
 
-                if (!integerp (ti))
+                if (ninfp (ti))
+                {
+                    switch (op)
+                    {
+                        case op_subtraction:
+                            return sx_positive_infinity;
+                        default:
+                            return ti;
+                    }
+                }
+                else if (pinfp (ti))
+                {
+                    switch (op)
+                    {
+                        case op_subtraction:
+                            return sx_negative_infinity;
+                        default:
+                            return ti;
+                    }
+                }
+                else if (!integerp (ti))
                 {
                     s->stack = cons (make_primitive (op), s->stack);
                     return sx_nonexistent;
                 }
 
+                n = sx_integer(ti);
+
                 switch (op)
                 {
                     case op_addition:
-                        i += sx_integer(ti);
+                        i += n;
+                        if ((o >= 0) && (n >= 0) && (i < o))
+                        {
+                            return sx_positive_infinity;
+                        }
+                        else if ((o < 0) && (n < 0) && (i > o))
+                        {
+                            return sx_negative_infinity;
+                        }
                         break;
                     case op_subtraction:
-                        i -= sx_integer(ti);
+                        i -= n;
+                        if ((o <= 0) && (n >= 0) && (i < o))
+                        {
+                            return sx_positive_infinity;
+                        }
+                        else if ((o >= 0) && (n < 0) && (i > o))
+                        {
+                            return sx_negative_infinity;
+                        }
                         break;
                     case op_multiplication:
-                        i *= sx_integer(ti);
+                        if ((i == 0) || (n == 0))
+                        {
+                            return make_integer (0);
+                        }
+                        i *= n;
                         break;
                     case op_division:
-                        i /= sx_integer(ti);
+                        if (i == 0)
+                        {
+                            return make_integer (0);
+                        }
+                        else if (n == 0)
+                        {
+                            return sx_positive_infinity;
+                        }
+                        i /= n;
                         break;
                     case op_modulo:
-                        i %= sx_integer(ti);
+                        i %= n;
                         break;
                     default:
                         break;
                 }
 
                 ta = cdr (ta);
+                o = i;
+            }
+
+            if (sx_integer(make_integer (i)) != i)
+            {
+                return (i >= 0) ? sx_positive_infinity : sx_negative_infinity;
             }
 
             return make_integer(i);
@@ -321,31 +406,6 @@ static sexpr lx_apply_primitive
     return args;
 }
 
-static sexpr eval_atom (sexpr sx, sexpr environment)
-{
-    sexpr b;
-
-    if (symbolp (sx))
-    {
-        b = lx_environment_lookup (environment, sx);
-        if (nexp (b))
-        {
-            b = primitive_unserialise (sx);
-
-            if (!nexp (b))
-            {
-                return b;
-            }
-        }
-        else
-        {
-            return b;
-        }
-    }
-
-    return sx;
-}
-
 static sexpr lx_simulate (struct machine_state *st)
 {
     sexpr a, b;
@@ -368,7 +428,7 @@ static sexpr lx_simulate (struct machine_state *st)
                     st->code = cdr (st->code);
                     b = lx_apply_primitive (p->op, st->code, st);
                   done_primitive_foreign:
-                    if (nexp (b))
+                    if (nexp (b) || unquotep(b))
                     {
                         reset = 1;
                         continue;

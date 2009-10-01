@@ -54,13 +54,21 @@
 ((lambda (a b) (equal? a b)) 1 2)
 ((lambda (a b) (equal? a b)) 1 1)
 
+;((lambda (a2 i2)
+;  (a2 a2 i2))
+;  (lambda (a i)
+;    (? (>? i 0)
+;       (+ 1 (a a (- i 1)))
+;       1))
+;  4000)
+
 ((lambda (a2 i2)
   (a2 a2 i2))
   (lambda (a i)
     (? (>? i 0)
        (* i (a a (- i 1)))
        1))
-  1000)
+  4000)
 
 (fx 1 2 3)
 
@@ -72,4 +80,4 @@
     (? (>? i 0)
        (* i (a a (- i 1)))
        1))
-  1000)
+  10)
