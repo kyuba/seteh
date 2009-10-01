@@ -27,6 +27,7 @@
 */
 
 #include <seteh/lambda.h>
+#include <curie/gc.h>
 
 struct sexpr_io *stdio;
 
@@ -56,7 +57,7 @@ int cmain ()
     {
         if (!nexp (sx))
         {
-            sexpr eval = lx_eval (sx, &env, sx_end_of_list);
+            sexpr eval = lx_eval (sx, env);
 
             if (truep(equalp (eval, make_integer (42))))
             {
@@ -66,6 +67,8 @@ int cmain ()
 /*            sx_write (stdio, sx);*/
             sx_write (stdio, eval);
 /*            sx_write (stdio, env);*/
+
+//            gc_invoke();
         }
     }
 

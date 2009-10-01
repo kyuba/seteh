@@ -26,7 +26,6 @@
  * THE SOFTWARE.
 */
 
-#include <seteh/lambda.h>
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
 #include <curie/gc.h>

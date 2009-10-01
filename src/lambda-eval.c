@@ -26,11 +26,8 @@
  * THE SOFTWARE.
 */
 
-#include <seteh/lambda.h>
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
-#include <curie/gc.h>
-#include <curie/string.h>
 
 #define define_primitive(o,s,v) \
     static const struct primitive sexpr_payload_sx_p_ ## o\
@@ -55,9 +52,9 @@ define_primitive (op_gte,            sym_gte,         ">=?");
 define_primitive (op_lt,             sym_lt,          "<?");
 define_primitive (op_lte,            sym_lte,         "<=?");
 define_primitive (op_equals,         sym_equals,      "=?");
-define_primitive (op_delay,          sym_delay,       "delay");
-define_primitive (op_force,          sym_force,       "force");
 define_primitive (op_eval,           sym_eval,        "eval");
+define_primitive (op_quote,          sym_quote,       "quote");
+define_primitive (op_list,           sym_list,        "list");
 
 static char initialised = 0;
 
@@ -98,9 +95,9 @@ static sexpr primitive_serialise (sexpr op)
         primitive_serialise_case (op_lt,             sym_lt);
         primitive_serialise_case (op_lte,            sym_lte);
         primitive_serialise_case (op_equals,         sym_equals);
-        primitive_serialise_case (op_delay,          sym_delay);
-        primitive_serialise_case (op_force,          sym_force);
         primitive_serialise_case (op_eval,           sym_eval);
+        primitive_serialise_case (op_quote,          sym_quote);
+        primitive_serialise_case (op_list,           sym_list);
     }
 
     return sym_bad_primitive;
@@ -126,9 +123,9 @@ static sexpr make_primitive (enum primitive_ops rop)
         make_primitive_case (op_lt);
         make_primitive_case (op_lte);
         make_primitive_case (op_equals);
-        make_primitive_case (op_delay);
-        make_primitive_case (op_force);
         make_primitive_case (op_eval);
+        make_primitive_case (op_quote);
+        make_primitive_case (op_list);
     }
 
      return sx_nonexistent;
@@ -156,9 +153,9 @@ static sexpr primitive_unserialise (sexpr op)
     primitive_unserialise_map (sym_lt,          op, op_lt);
     primitive_unserialise_map (sym_lte,         op, op_lte);
     primitive_unserialise_map (sym_equals,      op, op_equals);
-    primitive_unserialise_map (sym_delay,       op, op_delay);
-    primitive_unserialise_map (sym_force,       op, op_force);
     primitive_unserialise_map (sym_eval,        op, op_eval);
+    primitive_unserialise_map (sym_quote,       op, op_quote);
+    primitive_unserialise_map (sym_list,        op, op_list);
 
     primitive_unserialise_map (sym_if_alt,      op, op_if);
 
@@ -238,17 +235,28 @@ static sexpr lx_apply_primitive
         }
         case op_if:
         {
-            sexpr cond = lx_eval (car(args), &(s->environment), sx_end_of_list);
+//            sexpr cond = lx_eval (car(args), s->environment);
+            sexpr cond = car (args);
 
             if (!truep (cond) && !falsep (cond))
             {
-                return cons (make_primitive (op_if), args);
+                if (eolp (s->stack))
+                {
+                    s->stack = cons (make_primitive(op_if), s->stack);
+                    s->code = cons (cond, cons (sx_quote, cons (car (cdr(args)),
+                                    cons (sx_quote, cons (car (cdr (cdr(args))),
+                                    sx_end_of_list)))));
+                    return sx_nonexistent;
+                }
 
+                return cons (make_primitive (op_if), args);
             }
 
-            return truep(cond) ?
+            s->stack = sx_end_of_list;
+            s->code = truep(cond) ?
                             car (cdr (args)) :
                             car (cdr (cdr (args)));
+            return sx_unquote;
         }
         case op_equalp:
             if (eolp (s->stack))
@@ -274,7 +282,7 @@ static sexpr lx_apply_primitive
             {
                 if (eolp (s->stack))
                 {
-                    s->stack = cons (make_primitive(op_equalp), s->stack);
+                    s->stack = cons (make_primitive(op), s->stack);
                     return sx_nonexistent;
                 }
                 else
@@ -300,26 +308,14 @@ static sexpr lx_apply_primitive
                     return sx_nil;
             }
         }
-        case op_delay:
-            return lx_make_promise (args, s->environment);
-        case op_force:
-            if (promisep(args))
-            {
-                struct promise *p = (struct promise *)args;
-
-                s->dump = lx_make_state (s->stack, s->environment, s->code,
-                                         s->dump);
-
-                s->code = p->code;
-                s->environment = p->environment;
-                s->stack = sx_end_of_list;
-
-                return sx_nonexistent;
-            }
         case op_eval:
             s->code = args;
             s->stack = sx_end_of_list;
             return sx_nonexistent;
+        case op_quote:
+            return car (args);
+        case op_list:
+            return args;
     }
 
     return args;
@@ -350,153 +346,154 @@ static sexpr eval_atom (sexpr sx, sexpr environment)
     return sx;
 }
 
-sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
+static sexpr lx_simulate (struct machine_state *st)
 {
-    struct machine_state st =
-        { machine_state_type_identifier, sx_end_of_list, *env, sx, cont };
     sexpr a, b;
     char reset;
 
-//    sx_write (stdio, &st);
+//    gc_add_root ((sexpr*)st);
 
     do
     {
         reset = 0;
-//        sx_write (stdio, &st);
 
-        if (consp (st.code))
+        if (consp (st->code))
         {
-            if (eolp (st.stack))
+            if (eolp (st->stack))
             {
-                a = eval_atom (car (st.code), st.environment);
+                a = eval_atom (car (st->code), st->environment);
                 if (primitivep (a))
                 {
                     struct primitive *p = (struct primitive *)a;
-                    st.code = cdr (st.code);
-//                    sx_write (stdio, &st);
-                    b = lx_apply_primitive (p->op, st.code, &st);
+                    st->code = cdr (st->code);
+                    b = lx_apply_primitive (p->op, st->code, st);
                   done_primitive_foreign:
                     if (nexp (b))
                     {
-//                        sx_write (stdio, &st);
                         reset = 1;
                         continue;
                     }
                     else
                     {
-                        st.stack = cons (b, sx_end_of_list);
+                        st->stack = cons (b, sx_end_of_list);
                     }
                     goto done;
                 }
                 else if (consp (a))
                 {
                   sub_application:
-                    b = lx_make_state (st.stack, st.environment, cdr (st.code), st.dump);
-                    st.dump = cons (b, st.dump);
-                    st.stack = sx_end_of_list;
-                    st.code = a;
+                    b = lx_make_state (st->stack, st->environment,
+                                       cdr (st->code), st->dump);
+                    st->dump = cons (b, st->dump);
+                    st->stack = sx_end_of_list;
+                    st->code = a;
                     reset = 1;
                     continue;
                 }
                 else if (flambdap (a) || fmup (a))
                 {
                     struct foreign_lambda *l = (struct foreign_lambda *)a;
-                    st.code = cdr (st.code);
+                    st->code = cdr (st->code);
                     if (l->f)
                     {
-                        b = l->f (st.code, &st);
+                        b = l->f (st->code, st);
                         goto done_primitive_foreign;
                     }
                 }
-                else
+                else if (quotep (a))
                 {
-                    st.stack = cons (a, st.stack);
-                    st.code = cdr (st.code);
+                    st->code = cdr (st->code);
+                    a = cons (st->code, sx_end_of_list);
                 }
+
+                st->stack = cons (a, st->stack);
+                st->code = cdr (st->code);
             }
 
-            while (consp (st.code))
+            while (consp (st->code))
             {
-                a = car (st.code);
-                st.code = cdr (st.code);
+                a = car (st->code);
 
                 if (symbolp (a))
                 {
-                    st.stack = cons (eval_atom (a, st.environment), st.stack);
+                    st->stack = cons (eval_atom (a, st->environment),st->stack);
                 }
                 else if (consp (a))
                 {
                     goto sub_application;
                 }
+                else if (quotep (a))
+                {
+                    st->code = cdr (st->code);
+                    st->stack = cons (car (st->code), st->stack);
+                }
                 else
                 {
-                    st.stack = cons (a, st.stack);
+                    st->stack = cons (a, st->stack);
                 }
+
+                st->code = cdr (st->code);
             }
         }
-        else if (!eolp (st.code))
+        else if (!eolp (st->code))
         {
-            st.stack = cons (eval_atom (st.code, st.environment), st.stack);
+            st->stack = cons (eval_atom (st->code, st->environment), st->stack);
         }
 
-        if (!eolp (st.stack))
+        if (!eolp (st->stack))
         {
-            a = sx_reverse (st.stack);
+            a = sx_reverse (st->stack);
             b = car (a);
 
             if (primitivep (b))
             {
                 struct primitive *p = (struct primitive *)b;
-                b = lx_apply_primitive (p->op, cdr (a), &st);
-                if (nexp (b))
+                b = lx_apply_primitive (p->op, cdr (a), st);
+                if (unquotep (b))
                 {
-                    b = a; 
+                    reset = 1;
+                    continue;
+                }
+                else if (nexp (b))
+                {
+                    b = a;
                 }
 
-                st.stack = cons (b, sx_end_of_list);
+                st->stack = cons (b, sx_end_of_list);
             }
             else if (lambdap (b) || mup (b))
             {
                 struct lambda *l = (struct lambda *)b;
                 sexpr t, tb = cdr (a), n = l->arguments;
 
-//                sx_write (stdio, b);
-
-                st.environment =
-                        lx_environment_join (st.environment, l->environment);
-
-//                sx_write (stdio, &st);
+                st->environment =
+                        lx_environment_join (st->environment, l->environment);
 
                 while (consp (tb))
                 {
                     t  = car (n);
 
-                    st.environment =
-                            lx_environment_unbind (st.environment, t);
-                    st.environment =
-                            lx_environment_bind   (st.environment, t, car (tb));
+                    st->environment =
+                            lx_environment_unbind (st->environment, t);
+                    st->environment =
+                            lx_environment_bind   (st->environment, t, car(tb));
 
                     tb = cdr (tb);
                     n  = cdr (n);
                 }
 
-//                sx_write (stdio, &st);
-
                 if (consp (n))
                 {
-                    st.stack =
-                            cons (lx_lambda (cons (n, l->code), st.environment),
+                    st->stack =
+                            cons (lx_lambda (cons (n, l->code),st->environment),
                                   sx_end_of_list);
-
-//                    sx_write (stdio, &st);
                 }
                 else
                 {
-                    st.code  = l->code;
-                    st.stack = sx_end_of_list;
+                    st->code  = l->code;
+                    st->stack = sx_end_of_list;
 
                     reset = 1;
-//                    sx_write (stdio, &st);
                     continue;
                 }
             }
@@ -505,10 +502,15 @@ sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
                 struct foreign_lambda *l = (struct foreign_lambda *)b;
                 if (l->f)
                 {
-                    b = l->f (cdr (a), &st);
-                    if (!nexp (b))
+                    b = l->f (cdr (a), st);
+                    if (unquotep (b))
                     {
-                        st.stack = cons (b, sx_end_of_list);
+                        reset = 1;
+                        continue;
+                    }
+                    else if (!nexp (b))
+                    {
+                        st->stack = cons (b, sx_end_of_list);
                     }
                 }
             }
@@ -516,16 +518,16 @@ sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
 
       done:
 
-        if (consp (st.dump))
+        if (consp (st->dump))
         {
-            sexpr new_state = car (st.dump);
+            sexpr new_state = car (st->dump);
             if (mstatep (new_state))
             {
                 struct machine_state *m = (struct machine_state *)new_state;
-                st.stack = cons (car (st.stack), m->stack);
-                st.environment = m->environment;
-                st.code = m->code;
-                st.dump = m->dump;
+                st->stack = cons (car (st->stack), m->stack);
+                st->environment = m->environment;
+                st->code = m->code;
+                st->dump = m->dump;
 
                 reset = 1;
             }
@@ -533,7 +535,38 @@ sexpr lx_eval (sexpr sx, sexpr *env, sexpr cont)
     }
     while (reset == (char)1);
 
-//    sx_write (stdio, &st);
+//    gc_remove_root ((sexpr*)st);
 
-    return car (st.stack);
+    return car (st->stack);
+}
+
+sexpr lx_eval (sexpr sx, sexpr env)
+{
+    struct machine_state st =
+     { machine_state_type_identifier, sx_end_of_list, env, sx, sx_end_of_list };
+
+    return lx_simulate (&st);
+}
+
+sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
+{
+    struct machine_state st =
+    { machine_state_type_identifier, sx_end_of_list, env, cons (sx, args),
+      sx_end_of_list };
+
+    return lx_simulate (&st);
+}
+
+sexpr lx_continue (sexpr continuation)
+{
+    if (mstatep (continuation))
+    {
+        struct machine_state st =
+          { machine_state_type_identifier, sx_end_of_list, sx_end_of_list,
+            sx_end_of_list, continuation };
+
+        return lx_simulate (&st);
+    }
+
+    return sx_nonexistent;
 }

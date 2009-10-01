@@ -5,7 +5,7 @@
   (url "http://kyuba.org/")
 
   (code "tar" "patch" "lambda" "lambda-environment" "lambda-lambda-mu"
-        "lambda-promise" "lambda-eval" "lambda-state")
+        "lambda-eval" "lambda-state")
 
   (headers
         "tar" "patch" "lambda")

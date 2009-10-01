@@ -29,6 +29,7 @@
 #ifndef LIBSETEH_LAMBDA_INTERNAL_H
 #define LIBSETEH_LAMBDA_INTERNAL_H
 
+#include <seteh/lambda.h>
 #include <curie/sexpr.h>
 #include <curie/tree.h>
 
@@ -52,15 +53,9 @@ enum primitive_ops
     op_lt,
     op_lte,
     op_equals,
-    op_delay,
-    op_force,
-    op_eval
-};
-
-enum promise_type
-{
-    pt_automatic,
-    pt_manual
+    op_eval,
+    op_quote,
+    op_list
 };
 
 struct lambda
@@ -90,24 +85,13 @@ struct primitive
     enum primitive_ops op;
 };
 
-struct promise
-{
-    unsigned int type;
-    enum promise_type ptype;
-    sexpr environment;
-    sexpr code;
-};
-
 struct sexpr_io *stdio;
 
 void lx_sx_map_call (struct tree_node *node, void *u);
 void initialise_seteh_environment ( void );
 void initialise_seteh_lambda      ( void );
-void initialise_seteh_promise     ( void );
 void initialise_seteh_eval        ( void );
 void initialise_seteh_state       ( void );
-
-sexpr lx_make_automatic_promise (sexpr code, sexpr environment);
 
 #ifdef __cplusplus
 }

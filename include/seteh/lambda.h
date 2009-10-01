@@ -41,7 +41,6 @@ extern "C" {
 #define foreign_mu_type_identifier     0x03bf /* ο */
 #define environment_type_identifier    0x03b5 /* ε */
 #define primitive_type_identifier      0x03c6 /* φ */
-#define promise_type_identifier        0x03c7 /* χ */
 #define machine_state_type_identifier  0x03ce /* ώ */
 
 #define lambdap(sx)      sx_customp(sx,lambda_type_identifier)
@@ -50,7 +49,6 @@ extern "C" {
 #define fmup(sx)         sx_customp(sx,foreign_mu_type_identifier)
 #define environmentp(sx) sx_customp(sx,environment_type_identifier)
 #define primitivep(sx)   sx_customp(sx,primitive_type_identifier)
-#define promisep(sx)     sx_customp(sx,promise_type_identifier)
 #define mstatep(sx)      sx_customp(sx,machine_state_type_identifier)
 
 void initialise_seteh ( void );
@@ -68,15 +66,15 @@ sexpr lx_lambda             (sexpr sx, sexpr env);
 sexpr lx_mu                 (sexpr sx, sexpr env);
 sexpr lx_foreign_lambda     (sexpr name,sexpr(*f)(sexpr,struct machine_state*));
 sexpr lx_foreign_mu         (sexpr name,sexpr(*f)(sexpr,struct machine_state*));
-sexpr lx_apply              (sexpr sx, sexpr args, sexpr *env);
-sexpr lx_eval               (sexpr sx, sexpr *env, sexpr cont);
+sexpr lx_apply              (sexpr sx, sexpr args, sexpr env);
+sexpr lx_eval               (sexpr sx, sexpr env);
+sexpr lx_continue           (sexpr continuation);
 sexpr lx_make_environment   (sexpr env);
 sexpr lx_environment_lookup (sexpr env, sexpr key);
 sexpr lx_environment_unbind (sexpr env, sexpr key);
 sexpr lx_environment_bind   (sexpr env, sexpr key, sexpr value);
 sexpr lx_environment_join   (sexpr a, sexpr b);
 sexpr lx_environment_alist  (sexpr env);
-sexpr lx_make_promise       (sexpr code, sexpr environment);
 sexpr lx_make_state         (sexpr s, sexpr e, sexpr c, sexpr d);
 
 #ifdef __cplusplus

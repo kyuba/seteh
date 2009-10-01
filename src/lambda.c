@@ -26,11 +26,8 @@
  * THE SOFTWARE.
 */
 
-#include <seteh/lambda.h>
 #include <seteh/lambda-internal.h>
-#include <curie/memory.h>
 #include <curie/gc.h>
-#include <curie/string.h>
 
 static char initialised = 0;
 
@@ -40,7 +37,6 @@ void initialise_seteh ( void )
     {
         initialise_seteh_environment ();
         initialise_seteh_lambda ();
-        initialise_seteh_promise ();
         initialise_seteh_eval ();
         initialise_seteh_state ();
     }
