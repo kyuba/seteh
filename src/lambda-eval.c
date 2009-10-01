@@ -273,11 +273,11 @@ static sexpr lx_apply_primitive
                         break;
                     case op_subtraction:
                         i -= n;
-                        if ((o <= 0) && (n >= 0) && (i < o))
+                        if ((o <= 0) && (n >= 0) && (i > o))
                         {
                             return sx_positive_infinity;
                         }
-                        else if ((o >= 0) && (n < 0) && (i > o))
+                        else if ((o >= 0) && (n < 0) && (i < o))
                         {
                             return sx_negative_infinity;
                         }

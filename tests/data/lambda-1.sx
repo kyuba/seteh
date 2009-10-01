@@ -4,7 +4,7 @@
 ((lambda (a b c d e) e a b v (lambda (l) 12 l 2) f e) 23)
 (((lambda (a b c d e) e a b v (lambda (l) 12 l 2) f e) 23) 1 2 3 4)
 (+ 1 2 3 4)
-(- 1 2 3 4)
+(- 1 2 3 4 -1 -2 -3 -4 4)
 (* 1 2 3 4)
 (/ 1 2 3 4)
 (% 1 2 3 4)
