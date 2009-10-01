@@ -621,9 +621,10 @@ sexpr lx_continue (sexpr continuation)
 {
     if (mstatep (continuation))
     {
+        struct machine_state *stc = (struct machine_state *)continuation;
         struct machine_state st =
-          { machine_state_type_identifier, sx_end_of_list, sx_end_of_list,
-            sx_end_of_list, continuation };
+          { machine_state_type_identifier, stc->stack, stc->environment,
+            stc->code, stc->dump };
 
         return lx_simulate (&st);
     }
