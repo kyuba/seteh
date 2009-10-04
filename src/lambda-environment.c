@@ -32,8 +32,6 @@
 
 static struct tree environment_tree    = TREE_INITIALISER;
 
-static char initialised = 0;
-
 static sexpr environment_serialise      (sexpr env);
 static sexpr environment_unserialise    (sexpr env);
 static void  environment_tag            (sexpr env);
@@ -43,6 +41,8 @@ static sexpr environment_equalp         (sexpr a, sexpr b);
 
 void initialise_seteh_environment ( void )
 {
+    static char initialised = 0;
+
     if (!initialised)
     {
         sx_register_type
@@ -50,6 +50,8 @@ void initialise_seteh_environment ( void )
                  environment_serialise, environment_unserialise,
                  environment_tag, environment_destroy,
                  environment_call, environment_equalp);
+
+        initialised = (char)1;
     }
 }
 

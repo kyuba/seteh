@@ -29,16 +29,18 @@
 #include <seteh/lambda-internal.h>
 #include <curie/gc.h>
 
-static char initialised = 0;
-
 void initialise_seteh ( void )
 {
+    static char initialised = 0;
+
     if (!initialised)
     {
         initialise_seteh_environment ();
         initialise_seteh_lambda ();
         initialise_seteh_eval ();
         initialise_seteh_state ();
+
+        initialised = (char)1;
     }
 }
 

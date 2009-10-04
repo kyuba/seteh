@@ -32,8 +32,6 @@
 
 static struct tree state_tree          = TREE_INITIALISER;
 
-static char initialised = 0;
-
 static sexpr state_serialise            (sexpr secd);
 static sexpr state_unserialise          (sexpr secd);
 static void  state_tag                  (sexpr secd);
@@ -43,6 +41,8 @@ static sexpr state_equalp               (sexpr a, sexpr b);
 
 void initialise_seteh_state ( void )
 {
+    static char initialised = 0;
+
     if (!initialised)
     {
         sx_register_type
@@ -50,6 +50,8 @@ void initialise_seteh_state ( void )
                  state_serialise, state_unserialise,
                  state_tag, state_destroy,
                  state_call, state_equalp);
+
+        initialised = (char)1;
     }
 }
 

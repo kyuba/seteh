@@ -56,20 +56,22 @@ define_primitive (op_eval,           sym_eval,        "eval");
 define_primitive (op_quote,          sym_quote,       "quote");
 define_primitive (op_list,           sym_list,        "list");
 
-static char initialised = 0;
-
 static sexpr primitive_serialise        (sexpr op);
 static sexpr primitive_unserialise      (sexpr op);
 static sexpr primitive_equalp           (sexpr a, sexpr b);
 
 void initialise_seteh_eval ( void )
 {
+    static char initialised = 0;
+
     if (!initialised)
     {
         sx_register_type
                 (primitive_type_identifier,
                  primitive_serialise, primitive_unserialise,
                  (void *)0, (void *)0, (void *)0, primitive_equalp);
+
+        initialised = (char)1;
     }
 }
 

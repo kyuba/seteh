@@ -36,8 +36,6 @@ static struct tree mu_tree             = TREE_INITIALISER;
 static struct tree foreign_lambda_tree = TREE_INITIALISER;
 static struct tree foreign_mu_tree     = TREE_INITIALISER;
 
-static char initialised = 0;
-
 static sexpr lambda_serialise           (sexpr lambda);
 static sexpr lambda_unserialise         (sexpr lambda);
 static void  lambda_tag                 (sexpr lambda);
@@ -68,6 +66,8 @@ static sexpr foreign_mu_equalp          (sexpr a, sexpr b);
 
 void initialise_seteh_lambda ( void )
 {
+    static char initialised = 0;
+
     if (!initialised)
     {
         sx_register_type
@@ -93,6 +93,8 @@ void initialise_seteh_lambda ( void )
                  foreign_mu_serialise, foreign_mu_unserialise,
                  foreign_mu_tag, foreign_mu_destroy,
                  foreign_mu_call, foreign_mu_equalp);
+
+        initialised = (char)1;
     }
 }
 
