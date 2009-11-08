@@ -41,7 +41,7 @@ sexpr f (sexpr args, struct machine_state *environment)
 int cmain ()
 {
     struct io *in       = io_open_read        ("tests/data/lambda-1.sx");
-    struct sexpr_io *io = sx_open_io          (in, io_open_null);
+    struct sexpr_io *io = sx_open_i           (in);
     sexpr sx, env       = lx_make_environment (sx_end_of_list);
     int rv = 1;
 
