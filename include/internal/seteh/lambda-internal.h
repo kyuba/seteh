@@ -55,7 +55,9 @@ enum primitive_ops
     op_equals,
     op_eval,
     op_quote,
-    op_list
+    op_list,
+    op_car,
+    op_cdr
 };
 
 struct lambda

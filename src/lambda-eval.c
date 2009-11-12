@@ -55,6 +55,8 @@ define_primitive (op_equals,         sym_equals,      "=?");
 define_primitive (op_eval,           sym_eval,        "eval");
 define_primitive (op_quote,          sym_quote,       "quote");
 define_primitive (op_list,           sym_list,        "list");
+define_primitive (op_car,            sym_car,         "car");
+define_primitive (op_cdr,            sym_cdr,         "cdr");
 
 static sexpr primitive_serialise        (sexpr op);
 static sexpr primitive_unserialise      (sexpr op);
@@ -100,6 +102,8 @@ static sexpr primitive_serialise (sexpr op)
         primitive_serialise_case (op_eval,           sym_eval);
         primitive_serialise_case (op_quote,          sym_quote);
         primitive_serialise_case (op_list,           sym_list);
+        primitive_serialise_case (op_car,            sym_car);
+        primitive_serialise_case (op_cdr,            sym_cdr);
     }
 
     return sym_bad_primitive;
@@ -128,6 +132,8 @@ static sexpr make_primitive (enum primitive_ops rop)
         make_primitive_case (op_eval);
         make_primitive_case (op_quote);
         make_primitive_case (op_list);
+        make_primitive_case (op_car);
+        make_primitive_case (op_cdr);
     }
 
      return sx_nonexistent;
@@ -158,6 +164,8 @@ static sexpr primitive_unserialise (sexpr op)
     primitive_unserialise_map (sym_eval,        op, op_eval);
     primitive_unserialise_map (sym_quote,       op, op_quote);
     primitive_unserialise_map (sym_list,        op, op_list);
+    primitive_unserialise_map (sym_car,         op, op_car);
+    primitive_unserialise_map (sym_cdr,         op, op_cdr);
 
     primitive_unserialise_map (sym_if_alt,      op, op_if);
 
@@ -403,6 +411,22 @@ static sexpr lx_apply_primitive
             return car (args);
         case op_list:
             return args;
+        case op_car:
+        case op_cdr:
+            if (eolp (s->stack))
+            {
+                s->stack = cons (make_primitive(op), s->stack);
+                return sx_nonexistent;
+            }
+
+            if (op == op_car)
+            {
+                return car (car (args));
+            }
+            else
+            {
+                return cdr (car (args));
+            }
     }
 
     return args;
