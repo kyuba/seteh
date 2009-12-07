@@ -28,6 +28,7 @@
 
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
+#include <curie/math.h>
 
 #define define_primitive(o,s,v) \
     static const struct primitive sexpr_payload_sx_p_ ## o\
@@ -220,20 +221,29 @@ static sexpr lx_apply_primitive
         case op_division:
         case op_modulo:
         {
-            int_pointer_s i = 0, o = 0, n;
+            int_pointer   in = 0, n, g;
+            int_pointer_s id = 1, d;
             sexpr ta = args, ti = car (ta);
 
             if (ninfp (ti) || pinfp (ti))
             {
                 return ti;
             }
-            else if (!integerp (ti))
+            else if (integerp (ti))
+            {
+                in = sx_integer (ti);
+            }
+            else if (rationalp (ti))
+            {
+                in = sx_numerator   (ti);
+                id = sx_denominator (ti);
+            }
+            else
             {
                 s->stack = cons (make_primitive (op), s->stack);
                 return sx_nonexistent;
             }
 
-            o = i = sx_integer(ti);
             ta = cdr (ta);
 
             while (consp (ta))
@@ -260,73 +270,83 @@ static sexpr lx_apply_primitive
                             return ti;
                     }
                 }
-                else if (!integerp (ti))
+                else if (integerp (ti))
+                {
+                    n = sx_integer (ti);
+                    d = 1;
+                }
+                else if (rationalp (ti))
+                {
+                    n = sx_numerator   (ti);
+                    d = sx_denominator (ti);
+                }
+                else
                 {
                     s->stack = cons (make_primitive (op), s->stack);
                     return sx_nonexistent;
                 }
 
-                n = sx_integer(ti);
-
                 switch (op)
                 {
                     case op_addition:
-                        i += n;
-                        if ((o >= 0) && (n >= 0) && (i < o))
+                        if (id == d)
                         {
-                            return sx_positive_infinity;
+                            in += n;
                         }
-                        else if ((o < 0) && (n < 0) && (i > o))
+                        else
                         {
-                            return sx_negative_infinity;
+                            in *= d;
+                            n  *= id;
+                            id *= d;
+                            in += n;
                         }
                         break;
                     case op_subtraction:
-                        i -= n;
-                        if ((o <= 0) && (n >= 0) && (i > o))
+                        if (id == d)
                         {
-                            return sx_positive_infinity;
+                            in -= n;
                         }
-                        else if ((o >= 0) && (n < 0) && (i < o))
+                        else
                         {
-                            return sx_negative_infinity;
+                            in *= d;
+                            n  *= id;
+                            id *= d;
+                            in -= n;
                         }
                         break;
                     case op_multiplication:
-                        if ((i == 0) || (n == 0))
-                        {
-                            return make_integer (0);
-                        }
-                        i *= n;
+                        in *= n;
+                        id *= d;
                         break;
                     case op_division:
-                        if (i == 0)
-                        {
-                            return make_integer (0);
-                        }
-                        else if (n == 0)
-                        {
-                            return sx_positive_infinity;
-                        }
-                        i /= n;
+                        in *= d;
+                        id *= n;
                         break;
                     case op_modulo:
-                        i %= n;
+                        if (id == d)
+                        {
+                            in %= n;
+                        }
+                        else
+                        {
+                            in = 0;
+                        }
                         break;
                     default:
                         break;
                 }
 
+                g = gcd (in, id);
+                if (g > 1)
+                {
+                    in /= g;
+                    id /= g;
+                }
+
                 ta = cdr (ta);
-                o = i;
             }
 
-            if (sx_integer(make_integer (i)) != i)
-            {
-                return (i >= 0) ? sx_positive_infinity : sx_negative_infinity;
-            }
-
-            return make_integer(i);
+            return make_rational (in, id);
         }
         case op_if:
         {
