@@ -5,7 +5,7 @@
 */
 
 /*
- * Copyright (c) 2009, Kyuba Project Members
+ * Copyright (c) 2009, 2010, Kyuba Project Members
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
 #include <curie/gc.h>
+#include <curie/hash.h>
 
 static struct tree state_tree          = TREE_INITIALISER;
 
@@ -83,11 +84,13 @@ static void state_tag (sexpr secd)
 
 static void state_destroy (sexpr secd)
 {
-    sexpr tn = state_serialise (secd);
+    struct machine_state *st = (struct machine_state *)secd;
+    sexpr state[] = { st->stack, st->environment, st->code, st->dump };
+    int_pointer hash = hash_murmur2_pt ((void *)state, sizeof(state), 0);
 
     free_pool_mem ((void *)secd);
 
-    tree_remove_node(&state_tree, (int_pointer)tn);
+    tree_remove_node(&state_tree, hash);
 }
 
 static void state_call ( void )
@@ -97,7 +100,14 @@ static void state_call ( void )
 
 static sexpr state_equalp (sexpr a, sexpr b)
 {
-    return sx_false;
+    struct machine_state *sta = (struct machine_state *)a;
+    struct machine_state *stb = (struct machine_state *)b;
+
+    return (truep(equalp (sta->stack,       stb->stack)) &&
+            truep(equalp (sta->environment, stb->environment)) &&
+            truep(equalp (sta->code,        stb->code)) &&
+            truep(equalp (sta->dump,        stb->dump))) ?
+           sx_true : sx_false;
 }
 
 sexpr lx_make_state (sexpr s, sexpr e, sexpr c, sexpr d)
@@ -106,10 +116,10 @@ sexpr lx_make_state (sexpr s, sexpr e, sexpr c, sexpr d)
             = MEMORY_POOL_INITIALISER(sizeof (struct machine_state));
     struct machine_state *rv;
     struct tree_node *n;
+    sexpr state [] = { s, e, c, d };
+    int_pointer hash = hash_murmur2_pt ((void *)state, sizeof(state), 0);
 
-    sexpr t = cons (s, cons (e, cons (c, cons (d, sx_end_of_list))));
-
-    if ((n = tree_get_node (&state_tree, (int_pointer)t)))
+    if ((n = tree_get_node (&state_tree, hash)))
     {
         return (sexpr)node_get_value (n);
     }
@@ -127,7 +137,7 @@ sexpr lx_make_state (sexpr s, sexpr e, sexpr c, sexpr d)
     rv->code        = c;
     rv->dump        = d;
 
-    tree_add_node_value (&state_tree, (int_pointer)t, (void *)rv);
+    tree_add_node_value (&state_tree, hash, (void *)rv);
 
     return (sexpr)rv;
 }

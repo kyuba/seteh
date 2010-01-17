@@ -5,7 +5,7 @@
 */
 
 /*
- * Copyright (c) 2009, Kyuba Project Members
+ * Copyright (c) 2009, 2010, Kyuba Project Members
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@
 #include <seteh/lambda-internal.h>
 #include <curie/memory.h>
 #include <curie/gc.h>
+#include <curie/hash.h>
 
 static struct tree environment_tree    = TREE_INITIALISER;
 
@@ -77,11 +78,12 @@ static void environment_tag (sexpr env)
 static void environment_destroy (sexpr env)
 {
     struct environment *t = (struct environment *)env;
-    sexpr tn = t->environment;
+    int_pointer hash = hash_murmur2_pt
+        ((void *)&(t->environment), sizeof(t->environment), 0);
 
     free_pool_mem ((void *)env);
 
-    tree_remove_node(&environment_tree, (int_pointer)tn);
+    tree_remove_node(&environment_tree, hash);
 }
 
 static void environment_call ( void )
@@ -91,7 +93,8 @@ static void environment_call ( void )
 
 static sexpr environment_equalp (sexpr a, sexpr b)
 {
-    return sx_false;
+    return equalp (((struct environment *)a)->environment,
+                   ((struct environment *)b)->environment);
 }
 
 sexpr lx_make_environment (sexpr env)
@@ -100,8 +103,13 @@ sexpr lx_make_environment (sexpr env)
             = MEMORY_POOL_INITIALISER(sizeof (struct environment));
     struct environment *rv;
     struct tree_node *n;
+    int_pointer hash = hash_murmur2_pt ((void *)&env, sizeof(env), 0);
+    /* note: the hashing may seem pointless, but it does help performance by
+     * effectively randomising the input data, thus helping the tree performance
+     * by making it far less likely for the tree to degenerate into a linked
+     * list. */
 
-    if ((n = tree_get_node (&environment_tree, (int_pointer)env)))
+    if ((n = tree_get_node (&environment_tree, hash)))
     {
         return (sexpr)node_get_value (n);
     }
@@ -116,7 +124,7 @@ sexpr lx_make_environment (sexpr env)
     rv->type        = environment_type_identifier;
     rv->environment = env;
 
-    tree_add_node_value (&environment_tree, (int_pointer)env, (void *)rv);
+    tree_add_node_value (&environment_tree, hash, (void *)rv);
 
     return (sexpr)rv;
 }

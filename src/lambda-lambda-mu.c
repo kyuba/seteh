@@ -5,7 +5,7 @@
 */
 
 /*
- * Copyright (c) 2009, Kyuba Project Members
+ * Copyright (c) 2009, 2010, Kyuba Project Members
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@
 #include <curie/memory.h>
 #include <curie/gc.h>
 #include <curie/string.h>
+#include <curie/hash.h>
 
 static struct tree lambda_tree         = TREE_INITIALISER;
 static struct tree mu_tree             = TREE_INITIALISER;
@@ -126,8 +127,10 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
     static struct memory_pool pool
             = MEMORY_POOL_INITIALISER(sizeof (struct lambda));
     struct lambda *lx;
-    sexpr arguments, code, t, environment, na, nc, ne, u;
+    sexpr arguments, code, t, environment, na, nc, ne;
     struct tree_node *n;
+    sexpr ldata [3];
+    int_pointer hash;
 
     t = car (args);
     if (nexp (env))
@@ -154,11 +157,15 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
     nc = lx_code (&environment, arguments, code);
     ne = environment;
 
-    u = cons (ne, cons (na, nc));
+    ldata[0] = arguments;
+    ldata[1] = code;
+    ldata[2] = environment;
+
+    hash = hash_murmur2_pt ((void *)ldata, sizeof (ldata), 0);
 
     if ((n = tree_get_node (((type == lambda_type_identifier) ? &lambda_tree
                                                               : &mu_tree),
-                            (int_pointer)u)))
+                            hash)))
     {
         return (sexpr)node_get_value (n);
     }
@@ -179,7 +186,7 @@ static sexpr make_lambda (unsigned int type, sexpr args, sexpr env)
 
     tree_add_node_value
             (((type == lambda_type_identifier) ? &lambda_tree : &mu_tree),
-             (int_pointer)u, (void *)lx);
+             hash, (void *)lx);
 
     return (sexpr)lx;
 }
@@ -277,11 +284,13 @@ static void lambda_tag (sexpr lambda)
 
 static void lambda_destroy (sexpr lambda)
 {
-    sexpr t = lambda_serialise (lambda);
+    struct lambda *l = (struct lambda *)lambda;
+    sexpr ldata [] = { l->arguments, l->code, l->environment };
+    int_pointer hash = hash_murmur2_pt ((void *)ldata, sizeof(ldata), 0);
 
     free_pool_mem ((void *)lambda);
 
-    tree_remove_node(&lambda_tree, (int_pointer)t);
+    tree_remove_node(&lambda_tree, hash);
 }
 
 static void lambda_call ( void )
@@ -316,11 +325,12 @@ static void foreign_lambda_tag (sexpr lambda)
 static void foreign_lambda_destroy (sexpr lambda)
 {
     struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
-    sexpr t = lx->name;
+    unsigned long len;
+    int_32 hash = str_hash (sx_symbol (lx->name), &len);
 
     free_pool_mem ((void *)lambda);
 
-    tree_remove_node(&foreign_lambda_tree, (int_pointer)t);
+    tree_remove_node(&foreign_lambda_tree, (int_pointer)hash);
 }
 
 static void foreign_lambda_call ( void )
@@ -354,11 +364,14 @@ static void mu_tag (sexpr mu)
 
 static void mu_destroy (sexpr mu)
 {
-    sexpr t = lambda_serialise (mu);
+    struct lambda *m = (struct lambda *)mu;
+    sexpr mdata [] = { m->arguments, m->code, m->environment };
+    int_pointer hash = hash_murmur2_pt ((void *)mdata, sizeof(mdata), 0);
+
 
     free_pool_mem ((void *)mu);
 
-    tree_remove_node(&mu_tree, (int_pointer)t);
+    tree_remove_node(&mu_tree, hash);
 }
 
 static void mu_call ( void )
@@ -393,11 +406,12 @@ static void foreign_mu_tag (sexpr lambda)
 static void foreign_mu_destroy (sexpr lambda)
 {
     struct foreign_lambda *lx = (struct foreign_lambda *)lambda;
-    sexpr t = lx->name;
+    unsigned long len;
+    int_32 hash = str_hash (sx_symbol (lx->name), &len);
 
     free_pool_mem ((void *)lambda);
 
-    tree_remove_node(&foreign_mu_tree, (int_pointer)t);
+    tree_remove_node(&foreign_mu_tree, (int_pointer)hash);
 }
 
 static void foreign_mu_call ( void )
