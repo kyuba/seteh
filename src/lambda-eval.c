@@ -468,7 +468,15 @@ static sexpr lx_simulate (struct machine_state *st)
             if (eolp (st->stack))
             {
                 a = eval_atom (car (st->code), st->environment);
-                if (primitivep (a))
+                
+                if (environmentp (a))
+                {
+                    st->code = cdr (st->code);
+                    st->environment = lx_environment_join (st->environment, a);
+                    reset = 1;
+                    continue;
+                }
+                else if (primitivep (a))
                 {
                     struct primitive *p = (struct primitive *)a;
                     st->code = cdr (st->code);
@@ -551,7 +559,19 @@ static sexpr lx_simulate (struct machine_state *st)
             a = sx_reverse (st->stack);
             b = car (a);
 
-            if (primitivep (b))
+            if (environmentp (b))
+            {
+                sexpr t = cdr (a);
+                if (!eolp (t))
+                {
+                    st->stack = sx_end_of_list;
+                    st->environment = lx_environment_join (st->environment, b);
+                    st->code = t;
+                    reset = 1;
+                    continue;
+                }
+            }
+            else if (primitivep (b))
             {
                 struct primitive *p = (struct primitive *)b;
                 b = lx_apply_primitive (p->op, cdr (a), st);

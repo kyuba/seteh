@@ -89,3 +89,18 @@
   10)
 
 (cdr '(1 2 3))
+
+(ε (test . value))
+test
+((ε (test . value)) test)
+((ε (test . value)) f)
+test
+f
+((ε (f . value)) f)
+f
+
+(lambda () (quote (ε (test . value))))
+((lambda () (quote (ε (test . value)))) test)
+(((lambda () (quote (ε (test . value))))) test)
+test
+
