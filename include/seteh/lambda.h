@@ -69,6 +69,8 @@ sexpr lx_foreign_mu         (sexpr name,sexpr(*f)(sexpr,struct machine_state*));
 sexpr lx_apply              (sexpr sx, sexpr args, sexpr env);
 sexpr lx_eval               (sexpr sx, sexpr env);
 sexpr lx_continue           (sexpr continuation);
+sexpr lx_continue_explicit  (sexpr stack, sexpr environment, sexpr code,
+                             sexpr dump);
 sexpr lx_make_environment   (sexpr env);
 sexpr lx_environment_lookup (sexpr env, sexpr key);
 sexpr lx_environment_unbind (sexpr env, sexpr key);

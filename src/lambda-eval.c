@@ -683,16 +683,22 @@ sexpr lx_apply (sexpr sx, sexpr args, sexpr env)
     return lx_simulate (&st);
 }
 
+sexpr lx_continue_explicit
+    (sexpr stack, sexpr environment, sexpr code, sexpr dump)
+{
+    struct machine_state st =
+          { machine_state_type_identifier, stack, environment, code, dump };
+
+    return lx_simulate (&st);
+}
+
 sexpr lx_continue (sexpr continuation)
 {
     if (mstatep (continuation))
     {
         struct machine_state *stc = (struct machine_state *)continuation;
-        struct machine_state st =
-          { machine_state_type_identifier, stc->stack, stc->environment,
-            stc->code, stc->dump };
-
-        return lx_simulate (&st);
+        return lx_continue_explicit
+            (stc->stack, stc->environment, stc->code, stc->dump);
     }
 
     return sx_nonexistent;
