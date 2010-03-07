@@ -496,8 +496,8 @@ static sexpr lx_simulate (struct machine_state *st)
                 else if (consp (a))
                 {
                   sub_application:
-                    b = lx_make_state (st->stack, st->environment,
-                                       cdr (st->code), st->dump);
+                    b = cons (st->stack, cons (st->environment,
+                              cons (cdr (st->code), st->dump)));
                     st->dump = cons (b, st->dump);
                     st->stack = sx_end_of_list;
                     st->code = a;
@@ -647,16 +647,15 @@ static sexpr lx_simulate (struct machine_state *st)
         if (consp (st->dump))
         {
             sexpr new_state = car (st->dump);
-            if (mstatep (new_state))
-            {
-                struct machine_state *m = (struct machine_state *)new_state;
-                st->stack = cons (car (st->stack), m->stack);
-                st->environment = m->environment;
-                st->code = m->code;
-                st->dump = m->dump;
+            st->stack       = cons (car (st->stack), car (new_state));
+            new_state       = cdr (new_state);
+            st->environment = car (new_state);
+            new_state       = cdr (new_state);
+            st->code        = car (new_state);
+            new_state       = cdr (new_state);
+            st->dump        = car (new_state);
 
-                reset = 1;
-            }
+            reset = 1;
         }
     }
     while (reset == (char)1);
