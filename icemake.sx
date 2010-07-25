@@ -1,3 +1,7 @@
+;;
+; vim:ft=lisp
+;;
+
 (library "seteh" libcurie
   (name "Seteh")
   (description "Shell Utilities in Library Form")
@@ -10,9 +14,8 @@
   (headers
         "tar" "patch" "lambda")
 
-  (test-cases
-        "lambda")
-
 ;  (documentation
 ;        "description")
 )
+
+(test-case "lambda" libcurie (libraries "seteh") (code "test-lambda"))
